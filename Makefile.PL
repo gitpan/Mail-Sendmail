@@ -5,17 +5,24 @@ WriteMakefile(
     'NAME'    => 'Mail::Sendmail',
     'VERSION_FROM' => 'Sendmail.pm', # finds $VERSION
     'dist' => { COMPRESS=>"gzip", SUFFIX=>"gz" },
+#    'PREREQ_PM'  => {
+#        'Time::Local'   => 0,
+#        'Socket'        => 0,
+#        'Sys::Hostname' => 0
+#    },
     ($] ge '5.005')
         ? (
             'AUTHOR' => 'Milivoj Ivkovic <mi _at_ alma.ch>',
             'ABSTRACT' => 'Simple platform independent mailer',
+#            'BINARY_LOCATION' => "http://alma.ch/perl/ppm/Mail-Sendmail-$VERSION-PPM.tar.gz",
+            'PPM_INSTALL_SCRIPT' => 'test.pl',
            )
          : (),
+
 
 );
 
 print <<EOT
-
 **********************************************************************
 
 NOTE
@@ -30,6 +37,5 @@ the mail goes into a database from which I can get statistics.
 Read the docs, and have fun...
 
 **********************************************************************
-
 EOT
 ;

@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.78_3 - Simple platform independent mailer
+    Mail::Sendmail v. 0.78_5 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;

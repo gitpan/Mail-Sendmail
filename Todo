@@ -3,11 +3,8 @@
 
 - document $mail{Sender}
 - support SMTP AUTH
-- support server multi-line responses
 
 - Check with mod_perl
-
-- Also MIME-encode headers if they contain accented characters
 
 - During Makefile.PL, try to find a local SMTP server and the user's e-mail
 address, and offer to pre-configure these as defaults in Sendmail.pm. And
@@ -27,8 +24,6 @@ let the user enter defaults to override automatic detection.
 
 - Check we don't die if sending to multiple recipients, and one fails
 
-- Check that the "dot at start of line" problem is handled correctly now
-
 Also accept MIME::Lite objects?
 
 Have make dist generate README and html ?
@@ -38,6 +33,8 @@ Add install.ppm for PPM installs?
 Use 8BITMIME if available from server?
 
 Encode only if accented chars really present?
+
+Also MIME-encode headers if they contain accented characters? Make it configurable?
 
 Rename to Mail::Simple?
 

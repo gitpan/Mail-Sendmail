@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.78_3 - Simple platform independent mailer
+Mail::Sendmail v. 0.78_5 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.78_3';
+$VERSION = '0.78_5';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -236,18 +236,18 @@ sub sendmail {
     # cleanup message, and encode if needed
     $mail{'Message'} =~ s/\r\n/\n/go;     # normalize line endings, step 1 of 2 (next step after MIME encoding)
 
-    $mail{'Mime-version'} ||= '1.0';
-    $mail{'Content-type'} ||= 'text/plain; charset="iso-8859-1"';
+    $mail{'Mime-Version'} ||= '1.0';
+    $mail{'Content-Type'} ||= 'text/plain; charset="iso-8859-1"';
 
-    unless ( $mail{'Content-transfer-encoding'}
-          || $mail{'Content-type'} =~ /multipart/io )
+    unless ( $mail{'Content-Transfer-Encoding'}
+          || $mail{'Content-Type'} =~ /multipart/io )
     {
         if ($mailcfg{'mime'}) {
-            $mail{'Content-transfer-encoding'} = 'quoted-printable';
+            $mail{'Content-Transfer-Encoding'} = 'quoted-printable';
             $mail{'Message'} = encode_qp($mail{'Message'});
         }
         else {
-            $mail{'Content-transfer-encoding'} = '8bit';
+            $mail{'Content-Transfer-Encoding'} = '8bit';
             if ($mail{'Message'} =~ /[\x80-\xFF]/o) {
                 $error .= "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
                 warn "MIME::QuotedPrint not present!\n",
