@@ -5,6 +5,8 @@ suggestions or reporting bugs. I can't any more keep track of all
 the people who send me usefull comments, but I do read them and
 thank everybody!
 
+0.79   same as 0.78_6
+
 0.78_6 06.02.2003
        - Remove old configuration variables from version 0.74.
        - document $mail{Sender}

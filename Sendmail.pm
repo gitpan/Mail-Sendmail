@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.78_6 - Simple platform independent mailer
+Mail::Sendmail v. 0.79 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.78_6';
+$VERSION = '0.79';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in

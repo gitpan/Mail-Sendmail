@@ -18,7 +18,7 @@ WriteMakefile(
 ## how can I get the version MakeMaker found ?
 #            'BINARY_LOCATION' => "http://alma.ch/perl/ppm/Mail-Sendmail-$VERSION-PPM.tar.gz",
             'PPM_INSTALL_SCRIPT' => 'test.pl',
-			# add install exe! (PPM_INSTALL_EXEC ?)
+            # add install exe! (PPM_INSTALL_EXEC ?)
            )
          : (),
 

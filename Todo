@@ -1,7 +1,11 @@
-Check on older Perl
 
 # random thoughts about what to do next.
 # suggestions welcome
+
+- Check on older Perl 
+
+- Also MIME-encode headers if they contain accented characters
+  Make it configurable?
 
 - support SMTP AUTH
 
@@ -35,10 +39,7 @@ Use 8BITMIME if available from server?
 
 Encode only if accented chars really present?
 
-Also MIME-encode headers if they contain accented characters? Make it configurable?
-
 Rename to Mail::Simple?
-
 
 Not on my todo list anymore:
 
