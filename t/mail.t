@@ -1,4 +1,4 @@
-#!perl -w
+#!/usr/bin/perl -w
 
 # test Mail::Sendmail by sending a message to yourself
 
@@ -7,6 +7,8 @@ use Mail::Sendmail;
 my (%mail, $TZ, $server);
 my $adr = ""; 
 my $adr_rx = $Mail::Sendmail::address_rx;
+
+print "\ntest Mail::Sendmail $Mail::Sendmail::VERSION by sending a message to yourself\n\n";
 
 # Get e-mail address
 while (not $adr =~ /$adr_rx/) {
@@ -29,13 +31,14 @@ print "\n";
 $mail{Smtp} = $server if $server;
 
 # Get Time Zone
-print "Your Time Zone [<Enter> to use $Mail::Sendmail::TZ, 1 for Paris, -5 for New York, ...]: ";
+print "The current default Time Zone is $Mail::Sendmail::TZ\n";
+print "Your Time Zone [<Enter> to use default, 1 for Paris, -5 for New York, ...]: ";
 $TZ = <STDIN>;
 chomp($TZ);
 print "\n";
 
 if ($TZ ne "") {
-	print "TZ defined: $TZ\n";
+	print "TZ set to: $TZ\n";
 	$Mail::Sendmail::TZ = $TZ;
 }
 
@@ -50,5 +53,5 @@ $mail{Message} = <STDIN>;
 # Send it
 print "Sending...\n";
 
-if (sendmail %mail) { print "\nMail sent OK. \$Mail::Sendmail::log says:\n$Mail::Sendmail::log\n" }
+if (sendmail %mail) { print "\n\$Mail::Sendmail::log says:\n$Mail::Sendmail::log\n\nOK\n" }
 else { print "\n!Error sending mail: $Mail::Sendmail::error \n" }

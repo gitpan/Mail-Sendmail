@@ -1,0 +1,460 @@
+    <HTML> 
+	<HEAD> 
+	    <TITLE>Mail::Sendmail v. 0.71 - Simple platform independent mailer
+
+</TITLE> 
+	</HEAD>
+
+	<BODY><HTML>
+	<FONT FACE="Arial, Geneva, Helvetica">
+
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#NAME">NAME</A>
+	<LI><A HREF="#SYNOPSIS">SYNOPSIS</A>
+	<LI><A HREF="#DESCRIPTION">DESCRIPTION</A>
+	<LI><A HREF="#INSTALLATION">INSTALLATION</A>
+	<LI><A HREF="#FEATURES">FEATURES</A>
+	<LI><A HREF="#LIMITATIONS">LIMITATIONS</A>
+	<LI><A HREF="#USAGE_DETAILS">USAGE DETAILS</A>
+	<LI><A HREF="#CONFIGURATION">CONFIGURATION</A>
+	<LI><A HREF="#ANOTHER_EXAMPLE">ANOTHER EXAMPLE</A>
+	<LI><A HREF="#CHANGES">CHANGES</A>
+	<LI><A HREF="#AUTHOR">AUTHOR</A>
+	<LI><A HREF="#NOTES">NOTES</A>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<H3><A NAME="NAME">NAME
+
+</A></H3>
+Mail::Sendmail v. 0.71 - Simple platform independent mailer
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="SYNOPSIS">SYNOPSIS
+
+</A></H3>
+<PRE>  use Mail::Sendmail;
+</PRE>
+
+<P>
+
+<PRE>  %mail = ( To      =&gt; 'you@there.com',
+            From    =&gt; 'me@here.com',
+            Message =&gt; &quot;This is a minimalistic message&quot;
+           );
+</PRE>
+
+<P>
+
+<PRE>  if (sendmail %mail) { print &quot;Mail sent OK.\n&quot; }
+  else { print &quot;Error sending mail: $Mail::Sendmail::error \n&quot; }
+</PRE>
+
+<P>
+
+<PRE>  print STDERR &quot;\n\$Mail::Sendmail::log says:\n&quot;, $Mail::Sendmail::log;
+</PRE>
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="DESCRIPTION">DESCRIPTION
+
+</A></H3>
+Simple platform independent e-mail from your perl script.
+
+
+<P>
+
+After struggling for some time with various command-line mailing programs
+which didn't give me all the control I wanted, I found a nice script by
+Christian Mallwitz, put it into a module, and added a few features I
+wanted.
+
+
+<P>
+
+Mail::Sendmail contains mainly &amp;sendmail, which takes a hash with the
+message to send and sends it...
+
+
+<P>
+
+sendmail is exported to your namespace.
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="INSTALLATION">INSTALLATION
+
+</A></H3>
+- Copy Sendmail.pm to Mail/ in your Perl lib directory (eg.
+c:\Perl\lib\Mail\, c:\Perl\lib\site\Mail\, /usr/lib/perl5/site_perl/Mail/,
+... or whatever it is on your system)
+
+
+<P>
+
+- At the top of Sendmail.pm, set your Time Zone and your default SMTP
+server
+
+
+<P>
+
+- If you want to use MIME quoted-printable encoding, you need
+MIME::QuotedPrint from CPAN. It's in the MIME-Base64 package. To get it
+with your browser go to <A
+HREF="http://www.perl.com/CPAN//modules/by-module/MIME/">http://www.perl.com/CPAN//modules/by-module/MIME/</A>
+
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="FEATURES">FEATURES
+
+</A></H3>
+- Mime quoted printable encoding if requested (needs MIME::QuotedPrint)
+
+
+<P>
+
+- Bcc: and Cc: support
+
+
+<P>
+
+- Doesn't send unwanted headers
+
+
+<P>
+
+- Allows you to send any header you want
+
+
+<P>
+
+- Doesn't abort sending if there is a bad recipient address among other
+good ones
+
+
+<P>
+
+- Makes verbose error messages
+
+
+<P>
+
+- Adds the Date header if you don't supply your own
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="LIMITATIONS">LIMITATIONS
+
+</A></H3>
+Doesn't send attachments (you can still send them if you provide the
+appropriate headers and boundaries, but that may not be practical).
+
+
+<P>
+
+Not tested in a situation where the server goes down during session
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="USAGE_DETAILS">USAGE DETAILS
+
+</A></H3>
+<DL>
+<DT><STRONG><A NAME="item_sendmail">sendmail
+
+</A></STRONG><DD>
+sendmail is the only thing exported to your namespace
+
+
+<P>
+
+<CODE>sendmail(%mail) || print "Error sending mail: $Mail::Sendmail::error\n";</CODE>
+
+
+
+
+<P>
+
+- takes a hash containing the full message, with keys for all headers,
+Body, and optionally for another non-default SMTP server. (The Body part
+can be called ``Body'', ``Message'' or ``Text'')
+
+
+<P>
+
+- returns 1 on success, 0 on error.
+
+
+<P>
+
+updates <CODE>$Mail::Sendmail::error</CODE> and <CODE>$Mail::Sendmail::log</CODE>.
+
+
+<P>
+
+Keys are not case-sensitive. They get normalized before use with
+<CODE>ucfirst( lc $key )</CODE>
+
+
+
+
+<P>
+
+</DL>
+The following are not exported, but you can still access them with their
+full name:
+
+
+<P>
+
+<DL>
+<DT><STRONG><A NAME="item_Mail">Mail::Sendmail::time_to_date()
+
+</A></STRONG><DD>
+convert time ( as from <CODE>time()</CODE> ) to a string suitable for the Date header as per RFC 822.
+
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_VERSION">$Mail::Sendmail::VERSION
+
+</A></STRONG><DD>
+The package version number
+
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_error">$Mail::Sendmail::error
+
+</A></STRONG><DD>
+Fatal or non-fatal socket or SMTP server errors
+
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_log">$Mail::Sendmail::log
+
+</A></STRONG><DD>
+You can check it out after a sendmail to see what it says
+
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_address_rx">$Mail::Sendmail::address_rx
+
+</A></STRONG><DD>
+A handy regex to recognize e-mail addresses
+
+
+<P>
+
+<PRE>  Example:
+    $rx = $Mail::Sendmail::address_rx;
+    if (/$rx/) {
+      $address=$1;
+      $user=$2;
+      $domain=$3;
+    }
+</PRE>
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_default_smtp_se">$Mail::Sendmail::default_smtp_server
+
+</A></STRONG><DD>
+see Configuration below
+
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_default_smtp_po">$Mail::Sendmail::default_smtp_port
+
+</A></STRONG><DD>
+see Configuration below
+
+
+<P>
+
+<DT><STRONG><A NAME="item__Mail_Sendmail_TZ">$Mail::Sendmail::TZ
+
+</A></STRONG><DD>
+Time Zone. see Configuration below
+
+
+<P>
+
+</DL>
+<P>
+<HR>
+<H3><A NAME="CONFIGURATION">CONFIGURATION
+
+</A></H3>
+At the top of Sendmail.pm, there are 2 variables you have to set:
+
+
+<P>
+
+- your Time Zone (until I change the module so it finds the TZ itself). (1
+hour for daylight savings time is added if your system says it should be)
+
+
+<P>
+
+- your default SMTP server.
+
+
+<P>
+
+and the port number if your server doesn't use the default port 25 (which
+would be surprising, but who knows).
+
+
+<P>
+
+If you want a different server only for a particular script put
+  <CODE>$Mail::Sendmail::default_smtp_server = 'newserver.my-domain.com';</CODE>
+in your script.
+
+
+<P>
+
+If you want a different server only for a particular message, add it to
+your <CODE>%message</CODE> hash with a key of 'Smtp':
+  <CODE>$message{Smtp} = 'newserver.my-domain.com';</CODE>
+
+
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="ANOTHER_EXAMPLE">ANOTHER EXAMPLE
+
+</A></H3>
+<PRE>  use Mail::Sendmail;
+</PRE>
+
+<P>
+
+<PRE>  print STDERR &quot;Testing Mail::Sendmail version $Mail::Sendmail::VERSION\n&quot;;
+  print STDERR &quot;smtp server: $Mail::Sendmail::default_smtp_server\n&quot;;
+  print STDERR &quot;server port: $Mail::Sendmail::default_smtp_port\n&quot;;
+</PRE>
+
+<P>
+
+<PRE>  %mail = (
+      #To      =&gt; 'No to field this time, only Bcc and Cc',
+      From    =&gt; 'Myself &lt;me@here.com&gt;',
+      Bcc     =&gt; 'Someone &lt;him@there.com&gt;, Someone else her@there.com',
+      # only addresses are extracted from Bcc, real names disregarded
+      Cc      =&gt; 'Yet someone else &lt;xz@whatever.com&gt;',
+      # Cc will appear in the header. (Bcc will not)
+      Subject =&gt; 'Test message',
+      'Content-transfer-encoding' =&gt; 'quoted-printable',
+      'X-Mailer' =&gt; &quot;Mail::Sendmail&quot;,
+  );
+</PRE>
+
+<P>
+
+<PRE>  $mail{Smtp} = 'special_server.for-this-message-only.domain.com';
+  $mail{'X-custom'} = 'My custom additionnal header';
+  $mail{message} = &quot;Only a short message&quot;;
+  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ), # cheat on the date
+</PRE>
+
+<P>
+
+<PRE>  if (sendmail %mail) { print &quot;Mail sent OK.\n&quot; }
+  else { print &quot;Error sending mail: $Mail::Sendmail::error \n&quot; }
+</PRE>
+
+<P>
+
+<PRE>  print STDERR &quot;\n\$Mail::Sendmail::log says:\n&quot;, $Mail::Sendmail::log;
+</PRE>
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="CHANGES">CHANGES
+
+</A></H3>
+0.71: Fixed Time Zone bug with AS port. Added half-hour Time Zone support.
+Repackaged with \n line endings instead of \r\n.
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="AUTHOR">AUTHOR
+
+</A></H3>
+Milivoj Ivkovic <A HREF="MAILTO:mi@alma.ch">mi@alma.ch</A> or <A
+HREF="MAILTO:ivkovic@csi.com">ivkovic@csi.com</A>
+
+
+<P>
+
+<P>
+<HR>
+<H3><A NAME="NOTES">NOTES
+
+</A></H3>
+You can use this freely.
+
+
+<P>
+
+I would appreciate a short (or long) e-mail note if you do. And of course,
+bug-reports and/or improvements are welcome.
+
+
+<P>
+
+This version has been tested on Win95 and WinNT 4.0 with Perl 5.003_07 (AS
+313) and Perl 5.004_02 (GS), and on Linux 2.0.34 (Red Hat 5.1) with
+5.004_04.
+
+
+<P>
+
+Last revision: 07.07.98. Latest version should be available at <A
+HREF="http://alma.ch/perl/mail.htm">http://alma.ch/perl/mail.htm</A>
+
+
+<P>
+
+</DL>
+    </BODY>
+
+    </HTML>
