@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.73 - Simple platform independent mailer
+    Mail::Sendmail v. 0.74 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -12,7 +12,7 @@ SYNOPSIS
       if (sendmail %mail) { print "Mail sent OK.\n" }
       else { print "Error sending mail: $Mail::Sendmail::error \n" }
 
-      print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
+      print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
 DESCRIPTION
     Simple platform independent e-mail from your perl script.
@@ -25,72 +25,88 @@ DESCRIPTION
     with the message to send and sends it...
 
 INSTALLATION
-    - Copy Sendmail.pm to Mail/ in your Perl lib directory (eg.
-    c:\Perl\lib\Mail\, c:\Perl\lib\site\Mail\,
-    /usr/lib/perl5/site_perl/Mail/, ... or whatever it is on your
-    system)
+    Standard:
 
-    - At the top of Sendmail.pm, set your default SMTP server
+        perl Makefile.PL
+        make
+        make test
+        make install
 
-    - MIME::QuotedPrint is strongly recommended. It's in the MIME-
-    Base64 package. Get it from http://www.perl.com/CPAN/modules/by-
-    module/MIME. It is used by default on every message, and is
-    needed to send accented characters safely.
+    or manual:
+
+        Copy Sendmail.pm to Mail/ in your Perl lib directory.
+          (eg. c:\Perl\lib\Mail\, c:\Perl\lib\site\Mail\,
+           /usr/lib/perl5/site_perl/Mail/, ...
+           or whatever it is on your system)
+
+    At the top of Sendmail.pm, set your default SMTP server, unless
+    you specify it with each message, or want to use the default.
+
+    See the the NOTES manpage section about MIME::QuotedPrint. It is
+    not required but strongly recommended.
 
 FEATURES
-    - Automatic Mime quoted printable encoding (if MIME::QuotedPrint
-    installed)
+        Internal Bcc: and Cc: support (even on broken servers)
 
-    - Bcc: and Cc: support
+        Allows real names in From: and To: fields
 
-    - Doesn't send unwanted headers
+        Doesn't send unwanted headers, and allows you to send any
+        header(s) you want
 
-    - Allows you to send any header you want
+        Adds the Date header if you don't supply your own
 
-    - Doesn't abort sending if there is a bad recipient address
-    among other good ones
-
-    - Returns verbose error messages
-
-    - Adds the Date header if you don't supply your own
-
-    - Automatic Time Zone detection (hopefully)
+        Automatic Time Zone detection
 
 LIMITATIONS
-    Doesn't send attachments. You can probably still send them if
-    you provide the appropriate headers and boundaries, but that may
-    not be practical, and I haven't tested it.
-
-    Not tested in a situation where the server goes down during
-    session
+    Doesn't send attachments, unless you provide the appropriate
+    headers and boundaries yourself, but that may not be practical,
+    and I haven't tested it.
 
     The SMTP server has to be set manually in Sendmail.pm or in your
     script, unless you can live with the default (Compuserve's
     smpt.site1.csi.com).
 
-    I couldn't test the automatic time zone detection much. If it
-    doesn't work, set it manually (see below) and please let me
-    know.
+CONFIGURATION
+    default SMTP server
+        Set this at the top of Sendmail.pm, unless you want to use
+        the provided default.
+
+        You can override the default for a particular message by
+        adding it to your %message hash with a key of 'Smtp':
+
+        `$message{Smtp} = 'newserver.my-domain.com';'
+
+        Overriding it globally in your script with:
+
+        `$Mail::Sendmail::default_smtp_server = 'newserver.my-
+        domain.com';'
+
+        also works, but this may change in future versions! Better
+        do it in Sendmail.pm or in the %message hash.
+
+    other configuration settings
+        See individual entries under DETAILS below.
 
 DETAILS
     sendmail()
-        sendmail is the only thing exported to your namespace
+        sendmail is the only thing exported to your namespace by
+        default
 
         `sendmail(%mail) || print "Error sending mail:
         $Mail::Sendmail::error\n";'
 
-        - takes a hash containing the full message, with keys for
-        all headers, Body, and optionally for another non-default
-        SMTP server and/or Port. (The Body part can be called
-        "Body", "Message" or "Text")
+        It takes a hash containing the full message, with keys for
+        all headers, Body,and optionally for another non-default
+        SMTP server and/or Port. It returns 1 on success or 0 on
+        error, and rewrites `$Mail::Sendmail::error' and
+        `$Mail::Sendmail::log'.
 
-        - returns 1 on success, 0 on error.
+        Keys are NOT case-sensitive.
 
-        updates `$Mail::Sendmail::error' and `$Mail::Sendmail::log'.
+        The colon after headers is not necessary.
 
-        Keys are not case-sensitive. They get normalized before use
-        with `ucfirst( lc $key )'. The colon after headers is not
-        necessary.
+        The Body part key can be called "Body", "Message" or "Text".
+        The smtp server key can be called "Smtp" or "Server".
 
         The following headers are added unless you specify them
         yourself:
@@ -100,32 +116,33 @@ DETAILS
 
             Content-transfer-encoding: quoted-printable
             or (if MIME::QuotedPrint not installed)
-            Content-transfer-encoding: 8bit 
-            
+            Content-transfer-encoding: 8bit
+
             Date: [string returned by time_to_date()]
 
         If you put an 'X-mailer' header, the package version number
         is appended to it.
 
-    The following are not exported, but you can still access them
-    with their full name:
+    The following are not exported by default, but you can still
+    access them with their full name, or request their export on the
+    use line like in: `use Mail::Sendmail qw($address_rx
+    time_to_date);'
 
     Mail::Sendmail::time_to_date()
-        convert time ( as from `time()' ) to a string suitable for
-        the Date header as per RFC 822. See also
-        $Mail::Sendmail::TZ.
-
-    $Mail::Sendmail::VERSION
-        The package version number
+        convert time ( as from `time()' ) to an RFC 822 compliant
+        string for the Date header. See also $Mail::Sendmail::TZ.
 
     $Mail::Sendmail::error
-        Fatal or non-fatal socket or SMTP server errors
+        When you don't run with the -w flag, the module sends no
+        errors to STDERR, but puts anything it has to complain about
+        in here. You should probably always check if it says
+        something.
 
     $Mail::Sendmail::log
         A summary that you could write to a log file after each send
 
     $Mail::Sendmail::address_rx
-        A handy regex to recognize e-mail addresses
+        A handy regex to recognize e-mail addresses.
 
           Example:
             $rx = $Mail::Sendmail::address_rx;
@@ -135,57 +152,58 @@ DETAILS
               $domain=$3;
             }
 
+        The regex is a compromise between RFC 822 spec. and a simple
+        regex. See the code and comments if interested, and let me
+        know if it doesn't recognize what you expect.
+
     $Mail::Sendmail::default_smtp_server
-        see Configuration below
+        see Configuration above.
 
     $Mail::Sendmail::default_smtp_port
-        see Configuration below
+        If your server doesn't use the default port 25, change this
+        at the top of Sendmail.pm, or override it for a particular
+        message by adding it to your %message hash with a key of
+        'Port':
+
+        `$message{Port} = 8025;'
+
+        Global overriding with `$Mail::Sendmail::default_smtp_port =
+        8025;' is deprecated as above for the server, since future
+        versions may not use this anymore.
 
     $Mail::Sendmail::default_sender
-        see Configuration below
+        You can set this in Sendmail.pm, so you don't need to define
+        %message{From} in every message.
 
     $Mail::Sendmail::TZ
-        Your time zone. It should be set automatically, from the
-        difference between time() and gmtime(), unless it has been
-        preset in Sendmail.pm.
+        Your time zone. It is set automatically, from the difference
+        between time() and gmtime(), unless you have preset it in
+        Sendmail.pm.
 
-        If it doesn't work for you, let me know so I can try to fix
-        it, and in the meantime, set it manually in RFC 822
+        Or you can force it from your script, using an RFC 822
         compliant format:
 
         `$Mail::Sendmail::TZ = "+0200"; # Western Europe in summer'
 
-CONFIGURATION
-    default SMTP server (recommended setting)
-        Set this at the top of Sendmail.pm, unless you want to use
-        the provided default.
+    $Mail::Sendmail::use_MIME
+        This is set to 1 if you have MIME::QuotedPrint, to 0
+        otherwise. It's available in case you want to force it to
+        zero and do the encoding yourself. You would want this to do
+        multipart messages and/or attachments, but you may prefer
+        using some other package if you have complex needs.
 
-        You can override the default in a particular script with:
+    $Mail::Sendmail::connect_retries
+        Number of retries when the connection to the server fails.
+        Default is 1 retry (= 2 connection attempts).
 
-        `$Mail::Sendmail::default_smtp_server = 'newserver.my-
-        domain.com';'
+    $Mail::Sendmail::retry_delay
+        Seconds to wait before retrying to connect to the server.
+        Default is a low 5 seconds, so if you output results to a
+        web page, you don't time out. Set it much higher for scripts
+        that don't mind waiting.
 
-        or just for a particular message by adding it to your
-        %message hash with a key of 'Smtp':
-
-        `$message{Smtp} = 'newserver.my-domain.com';'
-
-    default port (optional)
-        If your server doesn't use the default port 25, also change
-        this at the top of Sendmail.pm.
-
-        Or override it for a particular script with:
-
-        `$Mail::Sendmail::default_smtp_port = 8025;'
-
-        or just for a particular message by adding it to your
-        %message hash with a key of 'Port':
-
-        `$message{Port} = 8025;'
-
-    $default_sender (optional)
-        If you set this, you don't need to define %message{From} in
-        every message.
+    $Mail::Sendmail::VERSION
+        The package version number (this cannot be exported)
 
 ANOTHER EXAMPLE
       use Mail::Sendmail;
@@ -194,8 +212,6 @@ ANOTHER EXAMPLE
       print STDERR "smtp server: $Mail::Sendmail::default_smtp_server\n";
       print STDERR "server port: $Mail::Sendmail::default_smtp_port\n";
 
-      $Mail::Sendmail::default_sender = 'This is me <myself@here.com>';
-      
       %mail = (
           #To      => 'No to field this time, only Bcc and Cc',
           #From    => 'not needed, use default',
@@ -209,8 +225,9 @@ ANOTHER EXAMPLE
 
       $mail{Smtp} = 'special_server.for-this-message-only.domain.com';
       $mail{'X-custom'} = 'My custom additionnal header';
-      $mail{message} = "Only a short message";
-      $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ), # cheat on the date
+      $mail{'mESSaGE : '} = "The message key looks terrible, but works.";
+      # cheat on the date:
+      $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ),
 
       if (sendmail %mail) { print "Mail sent OK.\n" }
       else { print "Error sending mail: $Mail::Sendmail::error \n" }
@@ -218,34 +235,35 @@ ANOTHER EXAMPLE
       print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
 CHANGES
-    0.73: Line endings changed again to hopefully be Mac compatible
-    at last. Automatic time zone detection. Support for SMTP Port
-    change for single messages. Always default to quoted-printable
-    encoding if possible. Added $Mail::Sendmail::default_sender.
-
-    0.72: Fixed line endings in Body to "\r\n". MIME quoted
-    printable encoding is now automatic if needed. Test script can
-    now run unattended.
-
-    0.71: Fixed Time Zone bug with AS port. Added half-hour Time
-    Zone support. Repackaged with \n line endings instead of \r\n.
+    Many changes and bug-fixes since version 0.73. See Changes file.
 
 AUTHOR
     Milivoj Ivkovic mi@alma.ch or ivkovic@csi.com
 
 NOTES
+    MIME::QuotedPrint is used by default on every message if
+    available. It is needed to send accented characters reliably.
+    (It is in the MIME-Base64 package at
+    http://www.perl.com/CPAN/modules/by-module/MIME/ ).
+
+    When using this module in CGI scripts, look out for problems
+    related to messages sent to STDERR. Some servers don't like it,
+    or log them somewhere where you don't know, or compile-time
+    errors are sent before you printed the HTML headers. Either be
+    sure to not run with the -w flag, or (better) print the HTML
+    headers in a BEGIN{} block, and maybe redirect STDERR to STDOUT.
+
     This module was first based on a script by Christian Mallwitz.
 
-    You can use it freely.
+    You can use it freely. (someone complained this is too vague.
+    So, more precisely: do whatever you want with it, but if it's
+    bad - like using it for spam or claiming you wrote it alone, or
+    ...? - terrible things will happen to you!)
 
-    I would appreciate a short (or long) e-mail note if you do (and
-    even if you don't, especially if you care to say why). And of
-    course, bug-reports and/or suggestions are welcome.
+    I would appreciate a short (or long) e-mail note if you use this
+    (and even if you don't, especially if you care to say why). And
+    of course, bug-reports and/or suggestions are welcome.
 
-    This version has been tested on Win95 and WinNT 4.0 with Perl
-    5.003_07 (AS 313) and Perl 5.004_02 (GS), and on Linux 2.0.34
-    (Red Hat 5.1) with 5.004_04.
-
-    Last revision: 13.07.98. Latest version should be available at
-    http://alma.ch/perl/mail.htm, and a few days later on CPAN.
+    Last revision: 01.08.98. Latest version should be available at
+    http://alma.ch/perl/mail.htm , and a few days later on CPAN.
 

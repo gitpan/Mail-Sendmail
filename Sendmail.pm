@@ -1,14 +1,22 @@
 package Mail::Sendmail;
 # Mail::Sendmail by Milivoj Ivkovic <mi@alma.ch> or <ivkovic@csi.com>
-# see embedded POD documentation below or http://alma.ch/perl/mail.htm
+# see embedded POD documentation after __END__
+# or http://alma.ch/perl/mail.htm
 
-$VERSION  = "0.73";
+=head1 NAME
 
-# *************** CUSTOMIZE the following lines *********************
+Mail::Sendmail v. 0.74 - Simple platform independent mailer
 
+=cut
+
+$VERSION = '0.74';
+
+# *************** CUSTOMIZE the following line(s) *******************
 # put your mail server name here (or override it in each message)
 
 $default_smtp_server = 'smtp.site1.csi.com';
+
+# That should be enough, but there is more below, in case you need it
 
 # if you have trouble with the automatic Time Zone detection, set it here
 # in RFC 822 compliant format ("+0330", "-0800", etc...)
@@ -22,15 +30,328 @@ $TZ = ''; # leave empty to auto-detect
 $default_smtp_port = 25;
 
 # you can also have a default from address:
+
 $default_sender = '';
 #$default_sender = 'This is me <me@here>'; # use single quotes or escape '@' ("me\@here") !
 
+$connect_retries = 1; # retry to connect after a failed attempt
+$retry_delay = 5; # seconds before retrying
+
+$debug = 0; # Not used yet.
+
 # *******************************************************************
 
-=head1 NAME
+BEGIN {
+    use strict;
+    use vars qw(
+                $VERSION
+                @ISA
+                @EXPORT
+                @EXPORT_OK
+                $default_smtp_server
+                $default_smtp_port
+                $default_sender
+                $TZ
+                $use_MIME
+                $address_rx
+                $debug
+                $log
+                $error
+                $retry_delay
+                $connect_retries
+               );
+    
+    require Exporter;
 
-Mail::Sendmail v. 0.73 - Simple platform independent mailer
+    use Socket;
+    use Time::Local; # for automatic time zone detection
+    
+    eval "use MIME::QuotedPrint";
+    if ($@) {
+        $use_MIME = 0;
+    }
+    else {$use_MIME = 1};
+    
+    @ISA        = qw(Exporter);
+    @EXPORT     = qw(&sendmail);
+    @EXPORT_OK  = qw(
+                     time_to_date
+                     $default_smtp_server
+                     $default_smtp_port
+                     $default_sender
+                     $TZ
+                     $address_rx
+                     $debug
+                     $log
+                     $error
+                     $use_MIME
+                    );
+} # end BEGIN block
 
+# A correct regex for valid e-mail addresses is (almost?) impossible.
+# This is an attempt to a reasonable compromise, that should accomodate
+# all real-world internet style addresses:
+# - No comments, no chars that would need to be quoted.
+# - Domain part necessary
+# - Some weird chars valid in user part, also accepted in domain part.
+
+# Let me know if you have problems with this.
+
+my $word_rx = '[\x21\x23-\x27\x2A-\x2D\w\x3D\x3F]+';
+
+# regex for e-mail addresses where full=$1, user=$2, domain=$3
+$address_rx =
+     '\b(('  . $word_rx         # valid chars starting at word boundary
+    .'(?:\.' . $word_rx . ')*)' # possibly more words preceded by a dot
+    .'\@'                       # @
+    .'('     .$word_rx          # same as for user part
+    .'(?:\.' .$word_rx  . ')*)' #
+    .')\b'                      # end at word boundary
+; # v. 0.3
+
+sub time_to_date {
+    # convert a time() value to a date-time string according to RFC 822
+
+    my $time = $_[0] || time(); # default to now if no argument
+
+    my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
+    my @wdays  = qw(Sun Mon Tue Wed Thu Fri Sat);
+
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
+        = localtime($time);
+
+    if ($TZ eq "") {
+        # offset in hours
+        my $offset  = sprintf "%.1f", (timegm(localtime) - time) / 3600;
+        my $minutes = sprintf "%02d", ( $offset - int($offset) ) * 60;
+        $TZ  = sprintf("%+03d", int($offset)) . $minutes;
+    }
+    return join(" ",
+                    ($wdays[$wday] . ','),
+                     $mday,
+                     $months[$mon],
+                     $year+1900,
+                     sprintf("%02d", $hour) . ":" . sprintf("%02d", $min),
+                     $TZ
+               );
+} # end sub time_to_date
+
+sub sendmail {
+    # original sendmail 1.21 by Christian Mallwitz.
+    # Modified and 'modulized' by ivkovic@csi.com
+    
+    $error = '';
+    $log = "Mail::Sendmail v. $VERSION - "    . scalar(localtime()) . "\n";
+
+    my $save_w = $^W;
+    local $_;
+    local $/;
+    $/ = "\015\012";
+
+    my (%mail, $k,
+        $smtp, $port,
+        $message, $fromaddr, $recip, @recipients,
+        $proto, $smtpaddr, $localhost
+       );
+
+    sub failure {
+        # things to do before returning a sendmail failure
+        print STDERR @_ if $^W;
+        $error .= join(" ", @_) . "\n";
+        close S;
+        return 0;
+    }
+    # redo hash, arranging keys case etc...
+
+    while (@_) {
+        $k = ucfirst lc(shift @_);
+        if (!$k and $^W) {
+            warn "Received false mail hash key: \'$k\'. Did you forget to put it in quotes?\n";
+        }
+        $k =~ s/\s*:\s*$//o; # kill colon (and possible spaces) at end, we add it later.
+        $mail{$k} = shift @_;
+    }
+
+    $smtp = $mail{'Smtp'} || $mail{'Server'} || $default_smtp_server;
+    # delete non-header keys, so we don't send them later as mail headers
+    # This doesn't seem to work with AS port 5.003_07: delete @mail{'Smtp', 'Server'};
+    delete $mail{'Smtp'}; delete $mail{'Server'};
+
+    $port = $mail{'Port'} || $default_smtp_port;
+    delete $mail{'Port'};
+
+    $^W = 0; # turn off errors: we use undefined values below
+    $message = join("", $mail{'Message'}, $mail{'Body'}, $mail{'Text'});
+    $^W = $save_w; # restore original -w flag
+    # delete @mail{'Message', 'Body', 'Text'};
+    delete $mail{'Message'}; delete $mail{'Body'}; delete $mail{'Text'};
+
+    # Extract 'From:' e-mail address
+    # this will not work with weird addresses.
+    
+    $fromaddr = $mail{'From'} || $default_sender;
+    unless ($fromaddr =~ /$address_rx/o) {
+        return failure("Bad or missing From address: \'$fromaddr\'");
+    }
+    $fromaddr = $1;
+
+    $mail{'X-mailer'} .= " ($VERSION)" if defined $mail{'X-mailer'};
+
+    # add Date header if needed
+    $mail{Date} ||= time_to_date() ;
+    $log .= "Date: $mail{Date}\n";
+
+    # cleanup message, and encode if needed
+    $message =~ s/^\./\.\./gom;     # handle . as first character
+    $message =~ s/\r\n/\n/go;     # normalize line endings, step 1 of 2 (next step after MIME encoding)
+
+    $mail{'Mime-version'} ||= '1.0';
+    $mail{'Content-type'} ||= 'text/plain; charset="iso-8859-1"';
+
+    if ($use_MIME) {
+        $mail{'Content-transfer-encoding'} = 'quoted-printable';
+        $message = encode_qp($message);
+    }
+    else {
+        $mail{'Content-transfer-encoding'} ||= '8bit';
+        #+ maybe warn only if there really are 8bit chars?
+        warn "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n" if $^W;
+        $error .= "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
+    }
+
+    $message =~ s/\n/\015\012/go; # normalize line endings, step 2.
+
+    # cleanup smtp
+    $smtp =~ s/^\s+//go; # remove spaces around $mail{Smtp}
+    $smtp =~ s/\s+$//go;
+
+    # Get recipients
+    $^W = 0; # turn off errors: we use undefined values below
+    $recip = join(", ", $mail{To}, $mail{Cc}, $mail{Bcc});
+    $^W = $save_w; # restore original -w flag
+    
+    delete $mail{'Bcc'};
+
+    @recipients = ();
+    while ($recip =~ /$address_rx/go) {
+        push @recipients, $1;
+    }
+    unless (@recipients) {
+        return failure("No recipient!")
+    }
+
+    $proto = (getprotobyname('tcp'))[2];
+
+    $smtpaddr =
+        ($smtp =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+        ? pack('C4',$1,$2,$3,$4)
+        : (gethostbyname($smtp))[4];
+
+    unless (defined($smtpaddr)) {
+        return failure("smtp host \"$smtp\" unknown");
+    }
+
+    # Add info to log variable
+    $log .=   "Server: $smtp Port: $port\n"
+            . "From: $fromaddr\n"
+            . "Subject: $mail{Subject}\n"
+            . "To: ";
+    
+    # get local hostname for polite HELO
+    my @ghbn = gethostbyname('localhost');
+    $localhost = $ghbn[0] || 'localhost';
+
+    # open socket and start mail session
+    
+    if (!socket(S, AF_INET, SOCK_STREAM, $proto)) {
+        return failure("socket failed ($!)")
+    }
+
+    # connect sometimes failed with no obvious reason.
+    # maybe retries can help?
+
+    while (!connect(S, pack('Sna4x8', AF_INET, $port, $smtpaddr))) {
+        if ($connect_retries > 0) {
+            $error .= "connect to $smtp failed ($!) retrying in $retry_delay seconds...\n";
+            sleep $retry_delay;
+            $connect_retries--;
+            next;
+        }
+        return failure("connect to $smtp failed ($!) no (more) retries!")
+    }
+
+    my($oldfh) = select(S); $| = 1; select($oldfh);
+
+    chomp($_ = <S>);
+    if (/^[45]/ or !$_) {
+        return failure("Connection error from $smtp ($_)")
+    }
+
+    print S "HELO $localhost\015\012"; # get a real hostname
+    chomp($_ = <S>);
+    if (/^[45]/ or !$_) {
+        return failure("HELO error ($_)")
+    }
+
+    print S "mail from: <$fromaddr>\015\012";
+    chomp($_ = <S>);
+    if (/^[45]/ or !$_) {
+        return failure("mail From: error ($_)")
+    }
+
+    my $bad_recipient_count;
+    foreach $to (@recipients) {
+        if ($debug) { print STDERR "sending to: <$to>\n"; }
+        print S "rcpt to: <$to>\015\012";
+        chomp($_ = <S>);
+        if (/^[45]/ or !$_) {
+            $log .= "!Failed: $to\n    ";
+            $bad_recipient_count++;
+            return failure("Error sending to <$to> ($_)\n");
+        }
+        else {
+            $log .= "$to\n    ";
+        }
+    }
+
+    # start data part
+    print S "data\015\012";
+    chomp($_ = <S>);
+    if (/^[45]/ or !$_) {
+           return failure("Cannot send data ($_)");
+    }
+
+    # print headers
+    foreach $header (keys %mail) {
+        print S "$header: ", $mail{$header}, "\015\012";
+    };
+
+    #- test cutting line here, to see what happens
+    #- print STDERR "CUT NOW!\n";
+    #- sleep 4;
+    #- print STDERR "trying to continue, expecting an error... \n";
+    #-
+
+    # send message body
+    print S "\015\012",
+            $message,
+            "\015\012.\015\012";
+
+    chomp($_ = <S>);
+    if (/^[45]/ or !$_) {
+           return failure("message transmission failed ($_)");
+    }
+
+    # finish
+    print S "quit\015\012";
+    $_ = <S>;
+    close S;
+
+    return 1;
+} # end sub sendmail
+
+1;
+__END__
 
 =head1 SYNOPSIS
 
@@ -44,61 +365,93 @@ Mail::Sendmail v. 0.73 - Simple platform independent mailer
   if (sendmail %mail) { print "Mail sent OK.\n" }
   else { print "Error sending mail: $Mail::Sendmail::error \n" }
 
-  print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
+  print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
 =head1 DESCRIPTION
 
 Simple platform independent e-mail from your perl script.
 
-After struggling for some time with various command-line mailing programs
-which never did exactly what I wanted, I put together this Perl only solution.
+After struggling for some time with various command-line mailing
+programs which never did exactly what I wanted, I put together this
+Perl only solution.
 
-Mail::Sendmail contains mainly &sendmail, which takes a hash with the
-message to send and sends it...
+Mail::Sendmail contains mainly &sendmail, which takes a hash with
+the message to send and sends it...
 
 =head1 INSTALLATION
 
-- Copy Sendmail.pm to Mail/ in your Perl lib directory
-  (eg. c:\Perl\lib\Mail\, c:\Perl\lib\site\Mail\,
-  /usr/lib/perl5/site_perl/Mail/, ... or whatever it is on your system)
+Standard:
 
-- At the top of Sendmail.pm, set your default SMTP server
+    perl Makefile.PL
+    make
+    make test
+    make install
 
-- MIME::QuotedPrint is strongly recommended. It's in the MIME-Base64 package.
-  Get it from http://www.perl.com/CPAN/modules/by-module/MIME. It is used
-  by default on every message, and is needed to send accented characters safely.
+or manual:
+
+    Copy Sendmail.pm to Mail/ in your Perl lib directory.
+      (eg. c:\Perl\lib\Mail\, c:\Perl\lib\site\Mail\,
+       /usr/lib/perl5/site_perl/Mail/, ...
+       or whatever it is on your system)
+
+At the top of Sendmail.pm, set your default SMTP server, unless
+you specify it with each message, or want to use the default.
+
+See the L<NOTES> section about MIME::QuotedPrint. It is not required
+but strongly recommended.
 
 =head1 FEATURES
 
-- Automatic Mime quoted printable encoding (if MIME::QuotedPrint installed)
+=over 4
+Automatic Mime quoted printable encoding (if MIME::QuotedPrint installed)
 
-- Bcc: and Cc: support
+Internal Bcc: and Cc: support (even on broken servers)
 
-- Doesn't send unwanted headers
+Allows real names in From: and To: fields
 
-- Allows you to send any header you want
+Doesn't send unwanted headers, and allows you to send any header(s) you want
 
-- Doesn't abort sending if there is a bad recipient address among other good ones
+Adds the Date header if you don't supply your own
 
-- Returns verbose error messages
+Automatic Time Zone detection
 
-- Adds the Date header if you don't supply your own
-
-- Automatic Time Zone detection (hopefully)
+=back
 
 =head1 LIMITATIONS
 
-Doesn't send attachments. You can probably still send them if you provide
-the appropriate headers and boundaries, but that may not be practical,
-and I haven't tested it.
-
-Not tested in a situation where the server goes down during session
+Doesn't send attachments, unless you provide the appropriate headers
+and boundaries yourself, but that may not be practical, and I haven't
+tested it.
 
 The SMTP server has to be set manually in Sendmail.pm or in your script,
 unless you can live with the default (Compuserve's smpt.site1.csi.com).
 
-I couldn't test the automatic time zone detection much. If it doesn't work,
-set it manually (see below) and please let me know.
+=head1 CONFIGURATION
+
+=over 4
+
+=item default SMTP server
+
+Set this at the top of Sendmail.pm, unless you want to use the
+provided default.
+
+You can override the default for a particular message by adding
+it to your %message hash with a key of 'Smtp':
+
+C<$message{Smtp} = 'newserver.my-domain.com';>
+
+Overriding it globally in your script with:
+
+C<$Mail::Sendmail::default_smtp_server = 'newserver.my-domain.com';>
+
+also works, but this may change in future versions! Better do it in
+Sendmail.pm or in the %message hash.
+
+=item other configuration settings
+
+See individual entries under DETAILS below.
+
+=back
 
 =head1 DETAILS
 
@@ -106,20 +459,21 @@ set it manually (see below) and please let me know.
 
 =item sendmail()
 
-sendmail is the only thing exported to your namespace
+sendmail is the only thing exported to your namespace by default
 
 C<sendmail(%mail) || print "Error sending mail: $Mail::Sendmail::error\n";>
 
-- takes a hash containing the full message, with keys for all headers, Body,
-  and optionally for another non-default SMTP server and/or Port.
-  (The Body part can be called "Body", "Message" or "Text")
+It takes a hash containing the full message, with keys for all headers,
+Body,and optionally for another non-default SMTP server and/or Port. It
+returns 1 on success or 0 on error, and rewrites C<$Mail::Sendmail::error>
+and C<$Mail::Sendmail::log>.
 
-- returns 1 on success, 0 on error.
+Keys are NOT case-sensitive.
 
-updates C<$Mail::Sendmail::error> and C<$Mail::Sendmail::log>.
+The colon after headers is not necessary.
 
-Keys are not case-sensitive. They get normalized before use with
-C<ucfirst( lc $key )>. The colon after headers is not necessary.
+The Body part key can be called "Body", "Message" or "Text".
+The smtp server key can be called "Smtp" or "Server".
 
 The following headers are added unless you specify them yourself:
 
@@ -128,8 +482,8 @@ The following headers are added unless you specify them yourself:
 
     Content-transfer-encoding: quoted-printable
     or (if MIME::QuotedPrint not installed)
-    Content-transfer-encoding: 8bit 
-    
+    Content-transfer-encoding: 8bit
+
     Date: [string returned by time_to_date()]
 
 If you put an 'X-mailer' header, the package version number
@@ -137,23 +491,22 @@ is appended to it.
 
 =back
 
-The following are not exported, but you can still access
-them with their full name:
+The following are not exported by default, but you can still access
+them with their full name, or request their export on the use line
+like in: C<use Mail::Sendmail qw($address_rx time_to_date);>
 
 =over 4
 
 =item Mail::Sendmail::time_to_date()
 
-convert time ( as from C<time()> ) to a string suitable for the Date header as per RFC 822.
-See also $Mail::Sendmail::TZ.
-
-=item $Mail::Sendmail::VERSION
-
-The package version number
+convert time ( as from C<time()> ) to an RFC 822 compliant string for
+the Date header. See also $Mail::Sendmail::TZ.
 
 =item $Mail::Sendmail::error
 
-Fatal or non-fatal socket or SMTP server errors
+When you don't run with the -w flag, the module sends no errors
+to STDERR, but puts anything it has to complain about in here.
+You should probably always check if it says something.
 
 =item $Mail::Sendmail::log
 
@@ -161,7 +514,7 @@ A summary that you could write to a log file after each send
 
 =item $Mail::Sendmail::address_rx
 
-A handy regex to recognize e-mail addresses
+A handy regex to recognize e-mail addresses.
 
   Example:
     $rx = $Mail::Sendmail::address_rx;
@@ -171,62 +524,62 @@ A handy regex to recognize e-mail addresses
       $domain=$3;
     }
 
+The regex is a compromise between RFC 822 spec. and a simple regex.
+See the code and comments if interested, and let me know if it doesn't
+recognize what you expect.
+
 =item $Mail::Sendmail::default_smtp_server
 
-see Configuration below
+see Configuration above.
 
 =item $Mail::Sendmail::default_smtp_port
 
-see Configuration below
-
-=item $Mail::Sendmail::default_sender
-
-see Configuration below
-
-=item $Mail::Sendmail::TZ
-
-Your time zone. It should be set automatically, from the difference
-between time() and gmtime(), unless it has been preset in Sendmail.pm.
-
-If it doesn't work for you, let me know so I can try to fix it,
-and in the meantime, set it manually in RFC 822 compliant format:
-
-C<$Mail::Sendmail::TZ = "+0200"; # Western Europe in summer>
-
-=back
-
-=head1 CONFIGURATION
-
-=over 4
-
-=item default SMTP server (recommended setting)
-
-Set this at the top of Sendmail.pm, unless you want to use the provided default.
-
-You can override the default in a particular script with:
-
-C<$Mail::Sendmail::default_smtp_server = 'newserver.my-domain.com';>
-
-or just for a particular message by adding it to your %message hash with a key of 'Smtp':
-
-C<$message{Smtp} = 'newserver.my-domain.com';>
-
-=item default port (optional)
-
-If your server doesn't use the default port 25, also change this at the
-top of Sendmail.pm.
-
-Or override it for a particular script with:
-
-C<$Mail::Sendmail::default_smtp_port = 8025;>
-
-or just for a particular message by adding it to your %message hash with a key of 'Port':
+If your server doesn't use the default port 25, change this at the
+top of Sendmail.pm, or override it for a particular message by adding
+it to your %message hash with a key of 'Port':
 
 C<$message{Port} = 8025;>
 
-=item $default_sender (optional)
+Global overriding with C<$Mail::Sendmail::default_smtp_port = 8025;>
+is deprecated as above for the server, since future versions may not
+use this anymore.
 
-If you set this, you don't need to define %message{From} in every message.
+=item $Mail::Sendmail::default_sender
+
+You can set this in Sendmail.pm, so you don't need to define
+%message{From} in every message.
+
+=item $Mail::Sendmail::TZ
+
+Your time zone. It is set automatically, from the difference
+between time() and gmtime(), unless you have preset it in Sendmail.pm.
+
+Or you can force it from your script, using an RFC 822 compliant format:
+
+C<$Mail::Sendmail::TZ = "+0200"; # Western Europe in summer>
+
+=item $Mail::Sendmail::use_MIME
+
+This is set to 1 if you have MIME::QuotedPrint, to 0 otherwise.
+It's available in case you want to force it to zero and do the
+encoding yourself. You would want this to do multipart messages
+and/or attachments, but you may prefer using some other package if
+you have complex needs.
+
+=item $Mail::Sendmail::connect_retries
+
+Number of retries when the connection to the server fails. Default 
+is 1 retry (= 2 connection attempts).
+
+=item $Mail::Sendmail::retry_delay
+
+Seconds to wait before retrying to connect to the server. Default is 
+a low 5 seconds, so if you output results to a web page, you don't 
+time out. Set it much higher for scripts that don't mind waiting.
+
+=item $Mail::Sendmail::VERSION
+
+The package version number (this cannot be exported)
 
 =back
 
@@ -238,8 +591,6 @@ If you set this, you don't need to define %message{From} in every message.
   print STDERR "smtp server: $Mail::Sendmail::default_smtp_server\n";
   print STDERR "server port: $Mail::Sendmail::default_smtp_port\n";
 
-  $Mail::Sendmail::default_sender = 'This is me <myself@here.com>';
-  
   %mail = (
       #To      => 'No to field this time, only Bcc and Cc',
       #From    => 'not needed, use default',
@@ -253,286 +604,48 @@ If you set this, you don't need to define %message{From} in every message.
 
   $mail{Smtp} = 'special_server.for-this-message-only.domain.com';
   $mail{'X-custom'} = 'My custom additionnal header';
-  $mail{message} = "Only a short message";
-  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ), # cheat on the date
+  $mail{'mESSaGE : '} = "The message key looks terrible, but works.";
+  # cheat on the date:
+  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ),
 
   if (sendmail %mail) { print "Mail sent OK.\n" }
   else { print "Error sending mail: $Mail::Sendmail::error \n" }
 
   print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
-
 =head1 CHANGES
 
-0.73: Line endings changed again to hopefully be Mac compatible at last.
-      Automatic time zone detection.
-      Support for SMTP Port change for single messages.
-      Always default to quoted-printable encoding if possible.
-      Added $Mail::Sendmail::default_sender.
-
-0.72: Fixed line endings in Body to "\r\n".
-      MIME quoted printable encoding is now automatic if needed.
-      Test script can now run unattended.
-
-0.71: Fixed Time Zone bug with AS port.
-      Added half-hour Time Zone support.
-      Repackaged with \n line endings instead of \r\n.
+Many changes and bug-fixes since version 0.73. See Changes file.
 
 =head1 AUTHOR
 
 Milivoj Ivkovic mi@alma.ch or ivkovic@csi.com
 
+=head1 NOTES
 
-=head1 NOTES                             
+MIME::QuotedPrint is used by default on every message if available.
+It is needed to send accented characters reliably. (It is in the
+MIME-Base64 package at http://www.perl.com/CPAN/modules/by-module/MIME/ ).
+
+When using this module in CGI scripts, look out for problems related
+to messages sent to STDERR. Some servers don't like it, or log them
+somewhere where you don't know, or compile-time errors are sent before
+you printed the HTML headers. Either be sure to not run with the -w flag,
+or (better) print the HTML headers in a BEGIN{} block, and maybe redirect
+STDERR to STDOUT.
 
 This module was first based on a script by Christian Mallwitz.
 
-You can use it freely.
+You can use it freely. (someone complained this is too vague.
+So, more precisely: do whatever you want with it, but if it's
+bad - like using it for spam or claiming you wrote it alone,
+or ...? - terrible things will happen to you!)
 
-I would appreciate a short (or long) e-mail note if you do (and even if you don't,
-especially if you care to say why).
+I would appreciate a short (or long) e-mail note if you use this
+(and even if you don't, especially if you care to say why).
 And of course, bug-reports and/or suggestions are welcome.
 
-This version has been tested on Win95 and WinNT 4.0 with
-Perl 5.003_07 (AS 313) and Perl 5.004_02 (GS),
-and on Linux 2.0.34 (Red Hat 5.1) with 5.004_04.
-
-Last revision: 13.07.98. Latest version should be available at
-http://alma.ch/perl/mail.htm, and a few days later on CPAN.
+Last revision: 01.08.98. Latest version should be available at
+http://alma.ch/perl/mail.htm , and a few days later on CPAN.
 
 =cut
-
-BEGIN {
-	use Exporter   ();
-	use Socket;
-	use Time::Local; # only needed for automatic time zone detection
-
-	eval "use MIME::QuotedPrint";
-	if ($@) {
-		$use_MIME = 0;
-	}
-	else {$use_MIME = 1};
-	
-	@ISA        = qw(Exporter);
-	@EXPORT     = qw(&sendmail);
-}
-
-$address_rx = '\b(([\w-]+(?:\.[\w-]+)*)\@([\w-]+(?:\.[\w-]+)+))\b'; # where full=$1, user=$2, domain=$3
-
-$debug = 0;
-
-sub time_to_date {
-	# convert a time() value to a date-time string according to RFC 822
-    
-    my $time = $_[0] || time(); # default to now if no argument
-
-	my @months = qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec);
-	my @wdays  = qw(Sun Mon Tue Wed Thu Fri Sat);
-
-	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($time);
-
-	$mon = $months[$mon];
-	$wday = $wdays[$wday];
-
-	if ($TZ eq "") {
-	    my $offset = sprintf "%.1f", ( timegm(localtime()) - time() ) / 3600; # in hours
-	    my $minutes = sprintf "%02d", ( $offset - int($offset) ) * 60;
-        $TZ  = sprintf("%+03d", int($offset)) . $minutes;
-    }    
-	return join(" ", $wday.",", $mday, $mon, $year+1900, sprintf("%02d", $hour) . ":" . sprintf("%02d", $min), $TZ );
-}
-
-sub sendmail {
-    # original sendmail 1.21 by Christian Mallwitz.
-    # Modified and 'modulized' by ivkovic@csi.com
-	
-	$error = '';
-    $log = "Mail::Sendmail v. $VERSION - "	. scalar(localtime()) . "\n";
-    
-    local $_;
-    
-	# redo hash, arranging keys case
-    my %mail; my $k;
-    while ($k = shift @_) {
-        $k = ucfirst lc $k;
-        $k =~ s/\s*:\s*$//o; # kill colon (and possible spaces) at end, we add it later.
-		$mail{$k} = shift @_;
-	}
-
-    my $smtp = $mail{Smtp} || $default_smtp_server;
-    delete $mail{Smtp} if $mail{Smtp}; # so we don't send it later as a header
-    
-    my $port = $mail{Port} || $default_smtp_port;
-    delete $mail{Port} if $mail{Port}; # so we don't send it later as a header
-
-    # the normal "my($port) = (getservbyname('smtp', 'tcp'))[2];" produced a 
-    # "runtime exception" under Win95, so it had to be hardcoded.
-
-    my $message	= $mail{Message} || $mail{Body} || $mail{Text};
-    delete($mail{Message}) || delete($mail{Body}) || delete($mail{Text}); # so we don't send it later as a header
-    
-    # Extract from e-mail address
-    my $fromaddr = $mail{From} || $default_sender;
-	unless ($fromaddr =~ /$address_rx/o) {
-		$error = "Bad or missing From address: $fromaddr";
-		return 0;
-	}	# get from email address
-    $fromaddr = $1;
-
-    $mail{'X-mailer'} .= " $VERSION" if defined $mail{'X-mailer'};
-
-	# add Date header if needed
-    unless ($mail{Date}) {
-        $mail{Date} = time_to_date;
-        $log .= "Date: $mail{Date}\n";
-    }
-
-    # cleanup message, and encode if needed
-    $message =~ s/^\./\.\./gom; 	# handle . as first character
-    $message =~ s/\r\n/\n/go; 	# normalize line endings, step 1 (next step after MIME encoding)
-
-    $mail{'Mime-version'} = '1.0' unless ($mail{'Mime-version'});
-    $mail{'Content-type'} = 'text/plain; charset="iso-8859-1"' unless ($mail{'Content-type'});
-
-    if ($use_MIME) {
-        $mail{'Content-transfer-encoding'} = 'quoted-printable';
-        $message = encode_qp($message);
-    }
-    else {
-        $mail{'Content-transfer-encoding'} = '8bit' unless ($mail{'Content-transfer-encoding'});
-        warn "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
-        $error .= "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
-    }
-    
-    $message =~ s/\n/\015\012/go; # normalize line endings, step 2.
-    
-	# cleanup smtp
-    $smtp =~ s/^\s+//go; # remove spaces around $mail{Smtp}
-    $smtp =~ s/\s+$//go;
-    
-    # Get recipients
-    # my $recip = join(' ', $mail{To}, $mail{Bcc}, $mail{Cc});
-    # Nice and short, but gives 'undefined' errors with -w switch,
-    # so here's another way:
-    my $recip = "";
-    $recip   .= $mail{To}        if defined $mail{To};
-    $recip   .= " " . $mail{Bcc} if defined $mail{Bcc};
-    $recip   .= " " . $mail{Cc}  if defined $mail{Cc};
-    
-    my @recipients = ();
-    while ($recip =~ /$address_rx/go) {
-    	push @recipients, $1;
-    }
-    unless (@recipients) { $error .= "No recipient!"; return 0 }
-
-    delete $mail{Bcc};
-    
-    my($proto) = (getprotobyname('tcp'))[2];
-    
-    my($smtpaddr) =
-    	($smtp =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-    	? pack('C4',$1,$2,$3,$4)
-    	: (gethostbyname($smtp))[4];
-    
-    unless (defined($smtpaddr)) {
-    	$error .= "smtp host \"$smtp\" unknown";
-    	return 0
-    }
-    
-	# Add info to log variable
-    $log .= "Server: $smtp Port: $port\n"
-    		   . "From: $fromaddr\n"
-    		   . "Subject: $mail{Subject}\n"
-    		   . "To: ";
-	
-	# open socket and start mail session
-	
-    if (!socket(S, AF_INET, SOCK_STREAM, $proto)) {
-    	$error .= "socket failed ($!)";
-    	return 0
-    }
-
-    if (!connect(S, pack('Sna4x8', AF_INET, $port, $smtpaddr))) {
-#    my $packed = pack('Sna4x8', AF_INET, $port, $smtpaddr);
-#    if (!connect(S, pack('Sna4x8', AF_INET, $port, $smtpaddr))) {
-#     	$error .= "connect failed to '$packed' ($!)";
-#    why does connect sometimes fail ?? Should I retry a few times?
-     	$error .= "connect failed ($!)";
-    	return 0;
-    }
-    
-    my($oldfh) = select(S); $| = 1; select($oldfh); # what is this $oldfh for? 
-    
-    $_ = <S>;
-    if (/^[45]/) {
-    	close S;
-    	$error .= "service unavailable: $_";
-		return 0;
-	}
-    
-    print S "helo localhost\015\012";
-    $_ = <S>;
-    if (/^[45]/) {
-    	$error .= "mysterious communication error: $_";
-    	close S;
-		return 0;
-	}
-    
-    print S "mail from: <$fromaddr>\015\012";
-    $_ = <S>;
-    if (/^[45]/) {
-    	$error .= "mysterious communication error: $_";
-    	close S;
-    	return 0;
-    }
-    
-    foreach $to (@recipients) {
-    	if ($debug) { print STDERR "sending to: <$to>\n"; }
-    	print S "rcpt to: <$to>\015\012";
-    	$_ = <S>;
-    	if (/^[45]/) {
-    		$error .= "Error sending to <$to>: $_\n";
-    		$log .= "!Failed: $to\n    ";
-    	}
-    	else {
-    		$log .= "$to\n    ";
-    	}
-    }
-    
-    # send headers
-    print S "data\015\012";
-    $_ = <S>;
-    if (/^[45]/) {
-    	$error .= "mysterious communication error: $_";
-    	close S;
-    	return 0;
-    }
-    
-    # print headers
-    foreach $header (keys %mail) {
-    	print S "$header: ", $mail{$header}, "\015\012";
-    };
-    
-    # send message body and quit
-    print S "\015\012",
-    		$message,
-    		"\015\012.\015\012"
-    		;
-    
-    $_ = <S>;
-    if (/^[45]/) {
-    	close S;
-    	$error .= "transmission of message failed: $_";
-    	return 0;
-    }
-    
-    print S "quit\015\012";
-    $_ = <S>;
-    
-    close S;
-    return 1;
-} # end sub sendmail
-
-1;
-	
-__END__
