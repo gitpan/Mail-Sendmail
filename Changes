@@ -2,8 +2,16 @@ Revision history for Perl extension Mail::Sendmail.
 
 Thanks to the people who helped between versions with suggestions or
 reporting bugs: Chris Nandor, Paul J. Schinder, "kybl", Kenneth Lee,
-Francisco, Chris Hostetter, Perrin Harkins, Tim Ward, ...
+Francisco, Chris Hostetter, Perrin Harkins, Tim Ward, ... and many
+others! (I can't any more keep track of all the people who send me
+usefull comments, but I do read them and thank everybody!)
 
+0.78  25.09.2000
+      - Now accepts single-letter host/domain names in addresses. They were
+        previously rejected, due to my misunderstanding of an RFC.
+      - Removed smtp.site1.csi.com from the default servers. That server is
+        not an open relay any more. This leaves only 'localhost' in the
+        servers list.
 0.77  28.03.99
       - If connection to 1st server failed, the others failed too, but
         only with certain Perl-version/OS combinations !?!.

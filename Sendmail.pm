@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.77 - Simple platform independent mailer
+Mail::Sendmail v. 0.78 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.77';
+$VERSION = '0.78';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -17,7 +17,7 @@ $VERSION = '0.77';
 
 %mailcfg = (
     # List of SMTP servers:
-    'smtp'    => [ qw( localhost smtp.site1.csi.com ) ],
+    'smtp'    => [ qw( localhost ) ],
     #'smtp'    => [ qw( mail.mydomain.com ) ], # example
 
     'from'    => '', # default sender e-mail, used when no From header in mail
@@ -84,11 +84,11 @@ my $word_rx = '[\x21\x23-\x27\x2A-\x2B\x2D\w\x3D\x3F]+';
 my $user_rx = $word_rx         # valid chars
              .'(?:\.' . $word_rx . ')*' # possibly more words preceded by a dot
              ;
-my $dom_rx = '\w[-\w]+(?:\.\w[-\w]+)*'; # less valid chars in domain names
+my $dom_rx = '\w[-\w]*(?:\.\w[-\w]*)*'; # less valid chars in domain names
 my $ip_rx = '\[\d{1,3}(?:\.\d{1,3}){3}\]';
 
-$address_rx = '\b((' . $user_rx . ')\@(' . $dom_rx . '\b|' . $ip_rx . '))';
-; # v. 0.4
+$address_rx = '((' . $user_rx . ')\@(' . $dom_rx . '|' . $ip_rx . '))';
+; # v. 0.6
 
 sub time_to_date {
     # convert a time() value to a date-time string according to RFC 822
@@ -452,14 +452,15 @@ Good plain text error reporting
 
 =head1 LIMITATIONS
 
+Doesn't work on OpenVMS.
+
 Headers are not encoded, even if they have accented characters.
 
 Since the whole message is in memory (twice!), it's not suitable for 
 sending very big attached files.
 
 The SMTP server has to be set manually in Sendmail.pm or in your script,
-unless you can live with the default (localhost or Compuserve's
-smpt.site1.csi.com).
+unless you have a mail server on localhost.
 
 =head1 CONFIGURATION
 
@@ -571,14 +572,15 @@ use. Writing C<$mailcfg{Port} = 2525;> is OK: the default $mailcfg{port}
 
 =item $mailcfg{smtp}
 
-C<$mailcfg{smtp} = [qw(localhost smtp.site1.csi.com)];>
+C<$mailcfg{smtp} = [qw(localhost my.other.mail.server)];>
 
 This is a reference to a list of smtp servers, so if your main server is
 down, the module tries the next one. If one of your servers uses a special
 port, add it to the server name with a colon in front, to override the
 default port (like in my.special.server:2525).
 
-Default: localhost and smtp.site1.csi.com (which seems to be an open relay)
+Default: localhost. (the previous version also had smtp.site1.csi.com which
+was an open relay, but it isn't anymore)
 
 =item $mailcfg{from}
 
@@ -658,7 +660,10 @@ The package version number (you can not import this one)
 
 =head2 Configuration variables from previous versions
 
-The following global variables were used in version 0.74 for configuration. They should still work, but will not in a future version (unless you complain loudly). Please use I<%mailcfg> if you need to access the configuration from your scripts.
+The following global variables were used in version 0.74 for configuration. 
+They should still work, but will not in a future version (unless you 
+complain loudly). Please use I<%mailcfg> if you need to access the 
+configuration from your scripts.
 
 =over 4
 
@@ -714,12 +719,12 @@ It is replaced by I<$mailcfg{mime}> which works.
 
 =head1 CHANGES
 
-Many changes and bug-fixes since version 0.74. In short: less code, more 
-functionality and docs. See the F<Changes> file.
+Single-letter host names bug fixed since version 0.77. See the F<Changes> file for
+the full history.
 
 =head1 AUTHOR
 
-Milivoj Ivkovic mi@alma.ch or ivkovic@csi.com
+Milivoj Ivkovic mi@alma.ch or ivkovic@bluewin.ch
 
 =head1 NOTES
 
@@ -741,7 +746,7 @@ I would appreciate a short (or long) e-mail note if you use this (and even
 if you don't, especially if you care to say why). And of course,
 bug-reports and/or suggestions are welcome.
 
-Last revision: 27.03.99. Latest version should be available at
+Last revision: 25.09.2000. Latest version should be available at
 http://alma.ch/perl/mail.htm , and a few days later on CPAN.
 
 =cut

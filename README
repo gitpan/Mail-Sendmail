@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.77 - Simple platform independent mailer
+    Mail::Sendmail v. 0.78 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -73,14 +73,15 @@ FEATURES
     Good plain text error reporting
 
 LIMITATIONS
+    Doesn't work on OpenVMS.
+
     Headers are not encoded, even if they have accented characters.
 
     Since the whole message is in memory (twice!), it's not suitable
     for sending very big attached files.
 
     The SMTP server has to be set manually in Sendmail.pm or in your
-    script, unless you can live with the default (localhost or
-    Compuserve's smpt.site1.csi.com).
+    script, unless you have a mail server on localhost.
 
 CONFIGURATION
     Default SMTP server(s)
@@ -192,7 +193,7 @@ DETAILS
     with your new value of 2525.
 
     $mailcfg{smtp}
-        `$mailcfg{smtp} = [qw(localhost smtp.site1.csi.com)];'
+        `$mailcfg{smtp} = [qw(localhost my.other.mail.server)];'
 
         This is a reference to a list of smtp servers, so if your
         main server is down, the module tries the next one. If one
@@ -200,8 +201,9 @@ DETAILS
         name with a colon in front, to override the default port
         (like in my.special.server:2525).
 
-        Default: localhost and smtp.site1.csi.com (which seems to be
-        an open relay)
+        Default: localhost. (the previous version also had
+        smtp.site1.csi.com which was an open relay, but it isn't
+        anymore)
 
     $mailcfg{from}
         `$mailcfg{from} = 'Mailing script me@mydomain.com';'
@@ -322,11 +324,11 @@ ANOTHER EXAMPLE
       print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
 CHANGES
-    Many changes and bug-fixes since version 0.74. In short: less
-    code, more functionality and docs. See the Changes file.
+    Single-letter host names bug fixed since version 0.77. See the
+    Changes file for the full history.
 
 AUTHOR
-    Milivoj Ivkovic mi@alma.ch or ivkovic@csi.com
+    Milivoj Ivkovic mi@alma.ch or ivkovic@bluewin.ch
 
 NOTES
     MIME::QuotedPrint is used by default on every message if
@@ -347,6 +349,8 @@ NOTES
     (and even if you don't, especially if you care to say why). And
     of course, bug-reports and/or suggestions are welcome.
 
-    Last revision: 27.03.99. Latest version should be available at
+    Last revision: 25.09.2000. Latest version should be available at
     http://alma.ch/perl/mail.htm , and a few days later on CPAN.
+
+
 

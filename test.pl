@@ -3,11 +3,19 @@
 # unattended Mail::Sendmail test, sends a message to the author
 # but you probably want to change $mail{To} below
 # to send the message to yourself.
+# version 0.78
 
-$mail{From} = 'Sendmail Test <sendmail@alma.ch>'; 
+# if you change your mail server, you may need to change the From:
+# address below.
+$mail{From} = 'Sendmail Test <sendmail@alma.ch>';
+
 $mail{To}   = 'Sendmail Test <sendmail@alma.ch>';
 #$mail{To}   = 'Sendmail Test <sendmail@alma.ch>, You me@myaddress';
-#$server = 'use.your.own.smtp.server';
+
+# if you want to get a copy of the test mail, you need to specify your
+# own server here, by name or IP address
+$server = '194.38.89.3';
+#$server = 'my.usual.mail.server';
 
 BEGIN { $| = 1; print "1..2\n"; }
 END {print "not ok 1\n" unless $loaded;}
@@ -19,12 +27,12 @@ print "ok 1\n";
 print <<EOT
 Test Mail::Sendmail $Mail::Sendmail::VERSION
 
-(The test is designed so it can be run by Test::Harness from CPAN.pm.
-Edit it to send the mail to yourself for more concrete feedback, and
-to change the default mail server from Compuserve's "smpt.site1.csi.com"
-to your own.)
-
 Try to send a message to the author (and/or whoever if you edited test.pl)
+
+(The test is designed so it can be run by Test::Harness from CPAN.pm.
+Edit it to send the mail to yourself for more concrete feedback. If you
+do this, you also need to specify a different mail server, and possibly
+a different From: address.)
 
 Current recipient(s): '$mail{To}'
 
