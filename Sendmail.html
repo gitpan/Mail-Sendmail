@@ -1,6 +1,6 @@
 <HTML>
 <HEAD>
-<TITLE>0.78_2 - Simple platform independent mailer</TITLE>
+<TITLE>0.78_3 - Simple platform independent mailer</TITLE>
 <LINK REV="made" HREF="mailto:root@net1.alma.ch">
 </HEAD>
 
@@ -41,7 +41,7 @@
 <HR>
 <P>
 <H1><A NAME="name">NAME</A></H1>
-<P>Mail::Sendmail v. 0.78_2 - Simple platform independent mailer</P>
+<P>Mail::Sendmail v. 0.78_3 - Simple platform independent mailer</P>
 <P>
 <HR>
 <H1><A NAME="synopsis">SYNOPSIS</A></H1>
@@ -63,14 +63,14 @@
 Perl 5 and a network connection.</P>
 <P>Mail::Sendmail contains mainly &amp;sendmail, which takes a hash with the
 message to send and sends it. It is intended to be very easy to setup and
-use.</P>
+use. See also <A HREF="#features">FEATURES</A> below.</P>
 <P>
 <HR>
 <H1><A NAME="installation">INSTALLATION</A></H1>
 <DL>
 <DT><STRONG><A NAME="item_Best">Best</A></STRONG><BR>
 <DD>
-perl -MCPAN -e ``install Mail::Sendmail''
+<CODE>perl -MCPAN -e &quot;install Mail::Sendmail&quot;</CODE>
 <P></P>
 <DT><STRONG><A NAME="item_Traditional">Traditional</A></STRONG><BR>
 <DD>
@@ -96,7 +96,7 @@ Todo, test.pl, ...) and PPM doesn't run the test script (test.pl).</P>
 <P>(Also, I'm not sure if it works with all ppm versions. Have yet to
 test it)</P>
 <P></P></DL>
-<P>At the top of Sendmail.pm, set your default SMTP server, unless you specify
+<P>At the top of Sendmail.pm, set your default SMTP server(s), unless you specify
 it with each message, or want to use the default (localhost).</P>
 <P>Install MIME::QuotedPrint. This is not required but strongly recommended.</P>
 <P>
@@ -104,23 +104,23 @@ it with each message, or want to use the default (localhost).</P>
 <H1><A NAME="features">FEATURES</A></H1>
 <P>Automatic time zone detection, Date: header, MIME quoted-printable encoding
 (if MIME::QuotedPrint installed), all of which can be overridden.</P>
-<P>Internal Bcc: and Cc: support (even on broken servers)</P>
-<P>Allows real names in From: and To: fields</P>
-<P>Doesn't send unwanted headers, and allows you to send any <CODE>header(s)</CODE> you
-want</P>
+<P>Bcc: and Cc: support.</P>
+<P>Allows real names in From:, To: and Cc: fields</P>
+<P>Doesn't send an X-Mailer: header (unless you do), and allows you to send any
+<CODE>header(s)</CODE> you want.</P>
 <P>Configurable retries and use of alternate servers if your mail server is
 down</P>
 <P>Good plain text error reporting</P>
 <P>
 <HR>
 <H1><A NAME="limitations">LIMITATIONS</A></H1>
-<P>Doesn't work on OpenVMS.</P>
 <P>Headers are not encoded, even if they have accented characters.</P>
 <P>No suport for the SMTP AUTH extension.</P>
 <P>Since the whole message is in memory (twice!), it's not suitable for
 sending very big attached files.</P>
 <P>The SMTP server has to be set manually in Sendmail.pm or in your script,
 unless you have a mail server on localhost.</P>
+<P>Doesn't work on OpenVMS, I was told. Cannot test this myself.</P>
 <P>
 <HR>
 <H1><A NAME="configuration">CONFIGURATION</A></H1>
@@ -155,8 +155,9 @@ body, and optionally for another non-default SMTP server and/or port.</P>
 <CODE>$Mail::Sendmail::error</CODE> and <CODE>$Mail::Sendmail::log</CODE>.</P>
 <P>Keys are NOT case-sensitive.</P>
 <P>The colon after headers is not necessary.</P>
-<P>The Body part key can be called 'Body', 'Message' or 'Text'. The SMTP
-server key can be called 'Smtp' or 'Server'.</P>
+<P>The Body part key can be called 'Body', 'Message' or 'Text'.</P>
+<P>The SMTP server key can be called 'Smtp' or 'Server'. If the connection to
+this one fails, the other ones in <A HREF="#item_%24mailcfg%7Bsmtp%7D"><CODE>$mailcfg{smtp}</CODE></A> will still be tried.</P>
 <P>The following headers are added unless you specify them yourself:</P>
 <PRE>
     Mime-version: 1.0
@@ -202,7 +203,8 @@ characters that would need to be quoted are not supported.</P>
 <H2><A NAME="%mail::sendmail::mailcfg">%Mail::Sendmail::mailcfg</A></H2>
 <P>This hash contains all configuration options. You normally edit it once (if
 ever) in Sendmail.pm and forget about it, but you could also access it from
-your scripts. For readability, I'll assume you have imported it.</P>
+your scripts. For readability, I'll assume you have imported it
+(with something like <CODE>use Mail::Sendmail qw(sendmail %mailcfg)</CODE>).</P>
 <P>The keys are not case-sensitive: they are all converted to lowercase before
 use. Writing <CODE>$mailcfg{Port} = 2525;</CODE> is OK: the default $mailcfg{port}
 (25) will be deleted and replaced with your new value of 2525.</P>
@@ -268,8 +270,8 @@ which do not use daylight savings time: see Microsoft KB article Q148681)</P>
 <DT><STRONG><A NAME="item_%24mailcfg%7Bdebug%7D">$mailcfg{debug}</A></STRONG><BR>
 <DD>
 <CODE>$mailcfg{debug} =</CODE> 0;&gt;
-<P>Prints stuff to STDERR. Not used much, and what is printed may change
-without notice. Don't count on it.</P>
+<P>Prints stuff to STDERR. Current maximum is 6, which prints the whole SMTP
+session, except data exceeding 500 bytes.</P>
 <P>Default: 0;</P>
 <P></P></DL>
 <P>
@@ -322,7 +324,7 @@ from your scripts.</P>
   $mail{'X-custom'} = 'My custom additionnal header';
   $mail{'mESSaGE : '} = &quot;The message key looks terrible, but works.&quot;;
   # cheat on the date:
-  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ),</PRE>
+  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 );</PRE>
 <PRE>
   if (sendmail %mail) { print &quot;Mail sent OK.\n&quot; }
   else { print &quot;Error sending mail: $Mail::Sendmail::error \n&quot; }</PRE>

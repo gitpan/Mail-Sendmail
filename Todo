@@ -25,6 +25,10 @@ let the user enter defaults to override automatic detection.
 
 - Does the test say OK if no mail could be sent? check and fix
 
+- Check we don't die if sending to multiple recipients, and one fails
+
+- Check that the "dot at start of line" problem is handled correctly now
+
 Also accept MIME::Lite objects?
 
 Have make dist generate README and html ?

@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.78_2 - Simple platform independent mailer
+    Mail::Sendmail v. 0.78_3 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -19,11 +19,11 @@ DESCRIPTION
 
     Mail::Sendmail contains mainly &sendmail, which takes a hash with the
     message to send and sends it. It is intended to be very easy to setup
-    and use.
+    and use. See also the section on "FEATURES" below.
 
 INSTALLATION
     Best
-        perl -MCPAN -e "install Mail::Sendmail"
+        `perl -MCPAN -e "install Mail::Sendmail"'
 
     Traditional
             perl Makefile.PL
@@ -50,7 +50,7 @@ INSTALLATION
         (Also, I'm not sure if it works with all ppm versions. Have yet to
         test it)
 
-    At the top of Sendmail.pm, set your default SMTP server, unless you
+    At the top of Sendmail.pm, set your default SMTP server(s), unless you
     specify it with each message, or want to use the default (localhost).
 
     Install MIME::QuotedPrint. This is not required but strongly
@@ -61,12 +61,12 @@ FEATURES
     encoding (if MIME::QuotedPrint installed), all of which can be
     overridden.
 
-    Internal Bcc: and Cc: support (even on broken servers)
+    Bcc: and Cc: support.
 
-    Allows real names in From: and To: fields
+    Allows real names in From:, To: and Cc: fields
 
-    Doesn't send unwanted headers, and allows you to send any header(s) you
-    want
+    Doesn't send an X-Mailer: header (unless you do), and allows you to send
+    any header(s) you want.
 
     Configurable retries and use of alternate servers if your mail server is
     down
@@ -74,8 +74,6 @@ FEATURES
     Good plain text error reporting
 
 LIMITATIONS
-    Doesn't work on OpenVMS.
-
     Headers are not encoded, even if they have accented characters.
 
     No suport for the SMTP AUTH extension.
@@ -85,6 +83,8 @@ LIMITATIONS
 
     The SMTP server has to be set manually in Sendmail.pm or in your script,
     unless you have a mail server on localhost.
+
+    Doesn't work on OpenVMS, I was told. Cannot test this myself.
 
 CONFIGURATION
     Default SMTP server(s)
@@ -125,8 +125,11 @@ DETAILS
 
     The colon after headers is not necessary.
 
-    The Body part key can be called 'Body', 'Message' or 'Text'. The SMTP
-    server key can be called 'Smtp' or 'Server'.
+    The Body part key can be called 'Body', 'Message' or 'Text'.
+
+    The SMTP server key can be called 'Smtp' or 'Server'. If the connection
+    to this one fails, the other ones in `$mailcfg{smtp}' will still be
+    tried.
 
     The following headers are added unless you specify them yourself:
 
@@ -180,7 +183,8 @@ DETAILS
 
     This hash contains all configuration options. You normally edit it once
     (if ever) in Sendmail.pm and forget about it, but you could also access
-    it from your scripts. For readability, I'll assume you have imported it.
+    it from your scripts. For readability, I'll assume you have imported it
+    (with something like `use Mail::Sendmail qw(sendmail %mailcfg)').
 
     The keys are not case-sensitive: they are all converted to lowercase
     before use. Writing `$mailcfg{Port} = 2525;' is OK: the default
@@ -258,8 +262,8 @@ DETAILS
     $mailcfg{debug}
         `$mailcfg{debug} =' 0;>
 
-        Prints stuff to STDERR. Not used much, and what is printed may
-        change without notice. Don't count on it.
+        Prints stuff to STDERR. Current maximum is 6, which prints the whole
+        SMTP session, except data exceeding 500 bytes.
 
         Default: 0;
 
@@ -303,7 +307,7 @@ ANOTHER EXAMPLE
       $mail{'X-custom'} = 'My custom additionnal header';
       $mail{'mESSaGE : '} = "The message key looks terrible, but works.";
       # cheat on the date:
-      $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ),
+      $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 );
 
       if (sendmail %mail) { print "Mail sent OK.\n" }
       else { print "Error sending mail: $Mail::Sendmail::error \n" }

@@ -5,8 +5,15 @@ suggestions or reporting bugs. I can't any more keep track of all
 the people who send me usefull comments, but I do read them and
 thank everybody!
 
-0.78_1 11.08.2002
-       - fix old bug with dot as 77th char.
+0.78_3 11.08.2002
+       - support multi-line responses
+       - define local $\ and $_ in &sendmail to protect us from outside settings
+         (is this really needed?)
+       - delete $mail{Sender} used for envelope sender, but not needed as header
+       - internal rewrite using subs to send and receive on socket
+
+0.78_2 11.08.2002
+       - fix old bug with dot as 77th char (check this!).
        - correct very old bug where port number was not extracted from
          stuff like 'my.server:2525'.
        - fix time_to_date bug with negative half-hour zones (only Newfoundland?)
@@ -18,6 +25,7 @@ thank everybody!
          now, so people who believe this is required because Outlook does it
          this way stop complaining. :-)
        - Minor documentation changes.
+
 0.78  25.09.2000
       - Now accepts single-letter host/domain names in addresses. They were
         previously rejected, due to my misunderstanding of an RFC.

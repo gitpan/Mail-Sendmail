@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.78_2 - Simple platform independent mailer
+Mail::Sendmail v. 0.78_3 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.78_2';
+$VERSION = '0.78_3';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -57,7 +57,7 @@ use vars qw(
 
 use Socket;
 use Time::Local; # for automatic time zone detection
-use Sys::Hostname;
+use Sys::Hostname; # for use of hostname in HELO
 
 # use MIME::QuotedPrint if available and configured in %mailcfg
 eval("use MIME::QuotedPrint");
@@ -125,14 +125,17 @@ sub sendmail {
     $error = '';
     $log = "Mail::Sendmail v. $VERSION - "    . scalar(localtime()) . "\n";
 
+    my $CRLF = "\015\012";
+    local $/ = $CRLF;
+    local $\ = ''; # to protect us from outside settings
     local $_;
-    local $/ = "\015\012";
 
     my (%mail, $k,
         $smtp, $server, $port, $connected, $localhost,
-        $message, $fromaddr, $recip, @recipients, $to, $header,
+        $fromaddr, $recip, @recipients, $to, $header,
        );
 
+    # -------- a few internal subs ----------
     sub fail {
         # things to do before returning a sendmail failure
         print STDERR @_ if $^W;
@@ -141,6 +144,38 @@ sub sendmail {
         return 0;
     }
 
+    sub socket_write {
+        my $i;
+        for $i (0..$#_) {
+            # accept references, so we don't copy potentially big data
+            my $data = ref($_[$i]) ? $_[$i] : \$_[$i];
+            if ($mailcfg{'debug'} > 5) {
+                if (length($$data) < 500) {
+                    print ">", $$data;
+                }
+                else {
+                    print "> [...", length($$data), " bytes sent ...]\n";
+                }
+            }
+            print(S $$data) || return 0;
+        }
+        1;
+    }
+
+    sub socket_read {
+        my $response; # for multi-line server responses
+        do {
+            chomp($_ = <S>);
+            print "<$_\n" if $mailcfg{'debug'} > 5;
+            if (/^[45]/ or !$_) {
+                return; # return false
+            }
+            $response .= $_;
+         } while (/^[\d]+-/);
+         return $response;
+    }
+    # -------- end of internal subs ----------
+
     # all config keys to lowercase, to prevent typo errors
     foreach $k (keys %mailcfg) {
         if ($k =~ /[A-Z]/) {
@@ -148,7 +183,7 @@ sub sendmail {
         }
     }
 
-    # redo hash, arranging keys case etc...
+    # redo mail hash, arranging keys case etc...
     while (@_) {
         $k = shift @_;
         if (!$k and $^W) {
@@ -179,15 +214,16 @@ sub sendmail {
 
     {    # don't warn for undefined values below
         local $^W = 0;
-        $message = join("", $mail{'Message'}, $mail{'Body'}, $mail{'Text'});
+        $mail{'Message'} = join("", $mail{'Message'}, $mail{'Body'}, $mail{'Text'});
     }
 
-    # delete @mail{'Message', 'Body', 'Text'};
-    delete $mail{'Message'}; delete $mail{'Body'}; delete $mail{'Text'};
+    # delete @mail{'Body', 'Text'};
+    delete $mail{'Body'}; delete $mail{'Text'};
 
-    # Extract 'From:' e-mail address
+    # Extract 'From:' e-mail address to use as envelope sender
 
     $fromaddr = $mail{'Sender'} || $mail{'From'} || $mailcfg{'from'};
+    delete $mail{'Sender'};
     unless ($fromaddr =~ /$address_rx/) {
         return fail("Bad or missing From address: \'$fromaddr\'");
     }
@@ -198,7 +234,7 @@ sub sendmail {
     $log .= "Date: $mail{Date}\n";
 
     # cleanup message, and encode if needed
-    $message =~ s/\r\n/\n/go;     # normalize line endings, step 1 of 2 (next step after MIME encoding)
+    $mail{'Message'} =~ s/\r\n/\n/go;     # normalize line endings, step 1 of 2 (next step after MIME encoding)
 
     $mail{'Mime-version'} ||= '1.0';
     $mail{'Content-type'} ||= 'text/plain; charset="iso-8859-1"';
@@ -208,11 +244,11 @@ sub sendmail {
     {
         if ($mailcfg{'mime'}) {
             $mail{'Content-transfer-encoding'} = 'quoted-printable';
-            $message = encode_qp($message);
+            $mail{'Message'} = encode_qp($mail{'Message'});
         }
         else {
             $mail{'Content-transfer-encoding'} = '8bit';
-            if ($message =~ /[\x80-\xFF]/o) {
+            if ($mail{'Message'} =~ /[\x80-\xFF]/o) {
                 $error .= "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
                 warn "MIME::QuotedPrint not present!\n",
                      "Sending 8bit characters without encoding, hoping it will come across OK.\n"
@@ -221,8 +257,8 @@ sub sendmail {
         }
     }
 
-    $message =~ s/^\./\.\./gom;     # handle . as first character
-    $message =~ s/\n/\015\012/go; # normalize line endings, step 2.
+    $mail{'Message'} =~ s/^\./\.\./gom;     # handle . as first character
+    $mail{'Message'} =~ s/\n/$CRLF/go; # normalize line endings, step 2.
 
     # Get recipients
     {    # don't warn for undefined values below
@@ -246,7 +282,7 @@ sub sendmail {
     foreach $server ( @{$mailcfg{'smtp'}} ) {
         # open socket needs to be inside this foreach loop on Linux,
         # otherwise all servers fail if 1st one fails !??! why?
-        unless ( socket S, AF_INET, SOCK_STREAM, (getprotobyname 'tcp')[2] ) {
+        unless ( socket S, AF_INET, SOCK_STREAM, scalar(getprotobyname 'tcp') ) {
             return fail("socket failed ($!)")
         }
 
@@ -300,47 +336,38 @@ sub sendmail {
 
     my($oldfh) = select(S); $| = 1; select($oldfh);
 
-    chomp($_ = <S>);
-    if (/^[45]/ or !$_) {
-        return fail("Connection error from $smtp on port $port ($_)")
-    }
-
-    print S "HELO $localhost\015\012";
-    chomp($_ = <S>);
-    if (/^[45]/ or !$_) {
-        return fail("HELO error ($_)")
-    }
-
-    print S "mail from: <$fromaddr>\015\012";
-    chomp($_ = <S>);
-    if (/^[45]/ or !$_) {
-        return fail("mail From: error ($_)")
-    }
+    socket_read()
+        || return fail("Connection error from $smtp on port $port ($_)");
+    socket_write("HELO $localhost$CRLF")
+        || return fail("send HELO error");
+    socket_read()
+        || return fail("HELO error ($_)");
+    socket_write("MAIL FROM: <$fromaddr>$CRLF")
+        || return fail("send MAIL FROM: error");
+    socket_read()
+        || return fail("MAIL FROM: error ($_)");
 
     foreach $to (@recipients) {
-        if ($debug) { print STDERR "sending to: <$to>\n"; }
-        print S "rcpt to: <$to>\015\012";
-        chomp($_ = <S>);
-        if (/^[45]/ or !$_) {
-            $log .= "!Failed: $to\n    ";
-            return fail("Error sending to <$to> ($_)\n");
-        }
-        else {
-            $log .= "$to\n    ";
-        }
+        socket_write("RCPT TO: <$to>$CRLF")
+            || return fail("send RCPT TO: error");
+        socket_read()
+            || return fail("RCPT TO: error ($_)");
+        $log .= "$to\n    ";
     }
 
     # start data part
-    print S "data\015\012";
-    chomp($_ = <S>);
-    if (/^[45]/ or !$_) {
-           return fail("Cannot send data ($_)");
-    }
+
+    socket_write("DATA$CRLF")
+        || return fail("send DATA error");
+    socket_read()
+        || return fail("DATA error ($_)");
 
     # print headers
     foreach $header (keys %mail) {
+        next if $header eq "Message";
         $mail{$header} =~ s/\s+$//o; # kill possible trailing garbage
-        print S "$header: ", $mail{$header}, "\015\012";
+        socket_write("$header: $mail{$header}$CRLF")
+            || return fail("send $header: error");
     };
 
     #- test diconnecting from network here, to see what happens
@@ -348,19 +375,17 @@ sub sendmail {
     #- sleep 4;
     #- print STDERR "trying to continue, expecting an error... \n";
 
-    # send message body
-    print S "\015\012",
-            $message,
-            "\015\012.\015\012";
-
-    chomp($_ = <S>);
-    if (/^[45]/ or !$_) {
-           return fail("message transmission failed ($_)");
-    }
+    # send message body (passed as a reference, in case it's big)
+    socket_write($CRLF, \$mail{'Message'}, "$CRLF.$CRLF")
+           || return fail("send message error");
+    socket_read()
+        || return fail("message transmission error ($_)");
+    $log .= "\nResult: $_";
 
     # finish
-    print S "quit\015\012";
-    $_ = <S>;
+    socket_write("QUIT$CRLF")
+           || return fail("send QUIT error");
+    socket_read();
     close S;
 
     return 1;
@@ -389,7 +414,7 @@ Perl 5 and a network connection.
 
 Mail::Sendmail contains mainly &sendmail, which takes a hash with the
 message to send and sends it. It is intended to be very easy to setup and
-use.
+use. See also L<"FEATURES"> below.
 
 =head1 INSTALLATION
 
@@ -397,7 +422,7 @@ use.
 
 =item Best
 
-perl -MCPAN -e "install Mail::Sendmail"
+C<perl -MCPAN -e "install Mail::Sendmail">
 
 =item Traditional
 
@@ -428,7 +453,7 @@ test it)
 
 =back
 
-At the top of Sendmail.pm, set your default SMTP server, unless you specify
+At the top of Sendmail.pm, set your default SMTP server(s), unless you specify
 it with each message, or want to use the default (localhost).
 
 Install MIME::QuotedPrint. This is not required but strongly recommended.
@@ -438,12 +463,12 @@ Install MIME::QuotedPrint. This is not required but strongly recommended.
 Automatic time zone detection, Date: header, MIME quoted-printable encoding
 (if MIME::QuotedPrint installed), all of which can be overridden.
 
-Internal Bcc: and Cc: support (even on broken servers)
+Bcc: and Cc: support.
 
-Allows real names in From: and To: fields
+Allows real names in From:, To: and Cc: fields
 
-Doesn't send unwanted headers, and allows you to send any header(s) you
-want
+Doesn't send an X-Mailer: header (unless you do), and allows you to send any
+header(s) you want.
 
 Configurable retries and use of alternate servers if your mail server is
 down
@@ -451,8 +476,6 @@ down
 Good plain text error reporting
 
 =head1 LIMITATIONS
-
-Doesn't work on OpenVMS.
 
 Headers are not encoded, even if they have accented characters.
 
@@ -463,6 +486,8 @@ sending very big attached files.
 
 The SMTP server has to be set manually in Sendmail.pm or in your script,
 unless you have a mail server on localhost.
+
+Doesn't work on OpenVMS, I was told. Cannot test this myself.
 
 =head1 CONFIGURATION
 
@@ -509,8 +534,10 @@ Keys are NOT case-sensitive.
 
 The colon after headers is not necessary.
 
-The Body part key can be called 'Body', 'Message' or 'Text'. The SMTP
-server key can be called 'Smtp' or 'Server'.
+The Body part key can be called 'Body', 'Message' or 'Text'.
+
+The SMTP server key can be called 'Smtp' or 'Server'. If the connection to
+this one fails, the other ones in C<$mailcfg{smtp}> will still be tried.
 
 The following headers are added unless you specify them yourself:
 
@@ -564,7 +591,8 @@ characters that would need to be quoted are not supported.
 
 This hash contains all configuration options. You normally edit it once (if
 ever) in Sendmail.pm and forget about it, but you could also access it from
-your scripts. For readability, I'll assume you have imported it.
+your scripts. For readability, I'll assume you have imported it
+(with something like C<use Mail::Sendmail qw(sendmail %mailcfg)>).
 
 The keys are not case-sensitive: they are all converted to lowercase before
 use. Writing C<$mailcfg{Port} = 2525;> is OK: the default $mailcfg{port}
@@ -648,8 +676,8 @@ Default: 25.
 
 C<$mailcfg{debug} => 0;>
 
-Prints stuff to STDERR. Not used much, and what is printed may change
-without notice. Don't count on it.
+Prints stuff to STDERR. Current maximum is 6, which prints the whole SMTP
+session, except data exceeding 500 bytes.
 
 Default: 0;
 
@@ -708,7 +736,7 @@ from your scripts.
   $mail{'X-custom'} = 'My custom additionnal header';
   $mail{'mESSaGE : '} = "The message key looks terrible, but works.";
   # cheat on the date:
-  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ),
+  $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 );
 
   if (sendmail %mail) { print "Mail sent OK.\n" }
   else { print "Error sending mail: $Mail::Sendmail::error \n" }
