@@ -4,6 +4,10 @@ Thanks to the people who helped between versions with suggestions or
 reporting bugs: Chris Nandor, Paul J. Schinder, "kybl", Kenneth Lee,
 Francisco, Chris Hostetter, Perrin Harkins, Tim Ward, ...
 
+0.77  28.03.99
+      - If connection to 1st server failed, the others failed too, but
+        only with certain Perl-version/OS combinations !?!.
+        Fixed (hopefuly).
 0.76  27.03.99
       - fixed bug which prevented trying other servers in list if
         connection to first failed.

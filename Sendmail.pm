@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.76 - Simple platform independent mailer
+Mail::Sendmail v. 0.77 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.76';
+$VERSION = '0.77';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -130,9 +130,8 @@ sub sendmail {
     local $/ = "\015\012";
 
     my (%mail, $k,
-        $smtp, $server, $port,
+        $smtp, $server, $port, $connected, $localhost,
         $message, $fromaddr, $recip, @recipients, $to, $header,
-        $smtpaddr, $localhost,
        );
 
     sub fail {
@@ -245,29 +244,29 @@ sub sendmail {
     # get local hostname for polite HELO
     $localhost = (gethostbyname('localhost'))[0] || 'localhost';
 
-    # open socket and start mail session
-    unless ( socket S, AF_INET, SOCK_STREAM, (getprotobyname 'tcp')[2] ) {
-        return fail("socket failed ($!)")
-    }
-
-    my $connected = 0;
     foreach $server ( @{$mailcfg{'smtp'}} ) {
-    	print "- trying $server\n" if $mailcfg{'debug'} > 1;
+        # open socket needs to be inside this foreach loop on Linux,
+        # otherwise all servers fail if 1st one fails !??! why?
+        unless ( socket S, AF_INET, SOCK_STREAM, (getprotobyname 'tcp')[2] ) {
+            return fail("socket failed ($!)")
+        }
+
+        print "- trying $server\n" if $mailcfg{'debug'} > 1;
+
         $server =~ s/\s+//go; # remove spaces just in case of a typo
         # extract port if server name like "mail.domain.com:2525"
         ($server =~ s/:(.+)$//o) ? $port = $1    : $port = $mailcfg{'port'};
-		$smtp = $server; # so we have $smtp after the foreach
-        $smtpaddr = inet_aton $server;
+        $smtp = $server; # save $server for use outside foreach loop
+
+        my $smtpaddr = inet_aton $server;
         unless ($smtpaddr) {
             $error .= "$server not found\n";
             next; # next server
         }
 
-        # connect sometimes failed with no obvious reason.
-        # maybe retries can help?
-        my $retried = 0;
-        while ( (not $connected = connect S, pack_sockaddr_in($port, $smtpaddr) )
-            and ($retried < $mailcfg{'retries'})
+        my $retried = 0; # reset retries for each server
+        while ( ( not $connected = connect S, pack_sockaddr_in($port, $smtpaddr) )
+            and ( $retried < $mailcfg{'retries'} )
               ) {
             $retried++;
             $error .= "connect to $server failed ($!)\n";
@@ -277,6 +276,7 @@ sub sendmail {
         }
 
         if ( $connected ) {
+            print "- connected to $server\n" if $mailcfg{'debug'} > 3;
             last;
         }
         else {
@@ -291,13 +291,13 @@ sub sendmail {
     };
 
     {
-	    local $^W = 0; # don't warn on undefined variables
-    	# Add info to log variable
-	    $log .= "Server: $smtp Port: $port\n"
+        local $^W = 0; # don't warn on undefined variables
+        # Add info to log variable
+        $log .= "Server: $smtp Port: $port\n"
               . "From: $fromaddr\n"
               . "Subject: $mail{Subject}\n"
               . "To: ";
-	}
+    }
 
     my($oldfh) = select(S); $| = 1; select($oldfh);
 
@@ -400,7 +400,11 @@ use.
 
 =over 4
 
-=item Standard
+=item Best
+
+perl -MCPAN -e "install Mail::Sendmail"
+
+=item Traditional
 
     perl Makefile.PL
     make
@@ -431,7 +435,8 @@ Install MIME::QuotedPrint. This is not required but strongly recommended.
 
 =head1 FEATURES
 
-Automatic Mime quoted printable encoding (if MIME::QuotedPrint installed)
+Automatic time zone detection, Date: header, MIME quoted-printable encoding 
+(if MIME::QuotedPrint installed), all of which can be overridden.
 
 Internal Bcc: and Cc: support (even on broken servers)
 
@@ -439,10 +444,6 @@ Allows real names in From: and To: fields
 
 Doesn't send unwanted headers, and allows you to send any header(s) you
 want
-
-Adds the Date header if you don't supply your own
-
-Automatic Time Zone detection
 
 Configurable retries and use of alternate servers if your mail server is
 down

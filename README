@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.76 - Simple platform independent mailer
+    Mail::Sendmail v. 0.77 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -26,7 +26,10 @@ DESCRIPTION
     easy to setup and use.
 
 INSTALLATION
-    Standard
+    Best
+        perl -MCPAN -e "install Mail::Sendmail"
+
+    Traditional
             perl Makefile.PL
             make
             make test
@@ -53,8 +56,9 @@ INSTALLATION
     recommended.
 
 FEATURES
-    Automatic Mime quoted printable encoding (if MIME::QuotedPrint
-    installed)
+    Automatic time zone detection, Date: header, MIME quoted-
+    printable encoding (if MIME::QuotedPrint installed), all of
+    which can be overridden.
 
     Internal Bcc: and Cc: support (even on broken servers)
 
@@ -62,10 +66,6 @@ FEATURES
 
     Doesn't send unwanted headers, and allows you to send any
     header(s) you want
-
-    Adds the Date header if you don't supply your own
-
-    Automatic Time Zone detection
 
     Configurable retries and use of alternate servers if your mail
     server is down

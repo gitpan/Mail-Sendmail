@@ -2,11 +2,11 @@ use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
-    'NAME'	=> 'Mail::Sendmail',
+    'NAME'    => 'Mail::Sendmail',
     'VERSION_FROM' => 'Sendmail.pm', # finds $VERSION 
     'dist' => { COMPRESS=>"gzip", SUFFIX=>"gz" },
     ($] ge '5.005')
-	    ? (
+        ? (
             'AUTHOR' => 'Milivoj Ivkovic <mi@alma.ch>',
             'ABSTRACT' => 'Simple platform independent mailer',
            )

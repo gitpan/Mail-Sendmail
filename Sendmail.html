@@ -1,6 +1,6 @@
 <HTML>
 <HEAD>
-<TITLE>0.76 - Simple platform independent mailer</TITLE>
+<TITLE>0.77 - Simple platform independent mailer</TITLE>
 <LINK REV="made" HREF="mailto:">
 </HEAD>
 
@@ -41,7 +41,7 @@
 <P>
 <H1><A NAME="NAME">NAME</A></H1>
 <P>
-Mail::Sendmail v. 0.76 - Simple platform independent mailer
+Mail::Sendmail v. 0.77 - Simple platform independent mailer
 
 <P>
 <HR>
@@ -82,7 +82,11 @@ use.
 <HR>
 <H1><A NAME="INSTALLATION">INSTALLATION</A></H1>
 <DL>
-<DT><STRONG><A NAME="item_Standard">Standard</A></STRONG><DD>
+<DT><STRONG><A NAME="item_Best">Best</A></STRONG><DD>
+<P>
+perl -MCPAN -e ``install Mail::Sendmail''
+
+<DT><STRONG><A NAME="item_Traditional">Traditional</A></STRONG><DD>
 <P>
 <PRE>    perl Makefile.PL
     make
@@ -118,7 +122,8 @@ Install MIME::QuotedPrint. This is not required but strongly recommended.
 <HR>
 <H1><A NAME="FEATURES">FEATURES</A></H1>
 <P>
-Automatic Mime quoted printable encoding (if MIME::QuotedPrint installed)
+Automatic time zone detection, Date: header, MIME quoted-printable encoding
+(if MIME::QuotedPrint installed), all of which can be overridden.
 
 <P>
 Internal Bcc: and Cc: support (even on broken servers)
@@ -129,12 +134,6 @@ Allows real names in From: and To: fields
 <P>
 Doesn't send unwanted headers, and allows you to send any
 <CODE>header(s)</CODE> you want
-
-<P>
-Adds the Date header if you don't supply your own
-
-<P>
-Automatic Time Zone detection
 
 <P>
 Configurable retries and use of alternate servers if your mail server is
