@@ -43,7 +43,6 @@ if ($TZ ne "") {
 print "Subject: ";
 $mail{Subject} = <STDIN>;
 chomp($mail{Subject});
-$mail{Subject} .= " ";
 
 print "Message text: ";
 $mail{Message} = <STDIN>;

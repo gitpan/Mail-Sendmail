@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.69 - sends mail... (would you believe it)
+    Mail::Sendmail v. 0.70 - sends mail... (would you believe it)
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -181,6 +181,6 @@ NOTES
     I would appreciate a short (or long) e-mail note if you do. And
     of course, bug-reports and/or improvements are welcome.
 
-    Last revision: 26.05.98. Latest version should be available at
+    Last revision: 18.06.98. Latest version should be available at
     http://alma.ch/perl/mail.htm
 

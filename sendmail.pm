@@ -2,7 +2,7 @@ package Mail::Sendmail;
 # Mail::Sendmail by Milivoj Ivkovic <mi@alma.ch> or <ivkovic@csi.com>
 # see embedded POD documentation below or http://alma.ch/perl/mail.htm
 
-$VERSION  = 0.69;
+$VERSION  = "0.70";
 
 # *************** CUSTOMIZE the following lines *********************
 
@@ -23,7 +23,7 @@ $default_smtp_port = 25;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.69 - sends mail... (would you believe it)
+Mail::Sendmail v. 0.70 - sends mail... (would you believe it)
 
 
 =head1 SYNOPSIS
@@ -220,7 +220,7 @@ You can use this freely.
 I would appreciate a short (or long) e-mail note if you do.
 And of course, bug-reports and/or improvements are welcome.
 
-Last revision: 26.05.98. Latest version should be available at
+Last revision: 18.06.98. Latest version should be available at
 http://alma.ch/perl/mail.htm
 
 =cut
@@ -272,9 +272,9 @@ sub sendmail {
     local $_;
     
 	# redo hash, arranging keys case
-    my %mail; my $k; my $v;
-    while (($k = shift @_) and ($v = shift @_)){
-		$mail{ucfirst lc $k} = $v;
+    my %mail; my $k;
+    while ($k = shift @_) {
+		$mail{ucfirst lc $k} = shift @_;
 	}
 
     my $smtp = $mail{Smtp} || $default_smtp_server;
@@ -452,6 +452,7 @@ sub sendmail {
 __END__
 changes:
 
+0.70:	corrected bug when hash key passed with empty or undefined (=false) value
 0.69:   use MIME::Quotedprint in eval, so it works without it.
 0.64:	Message body can be in $mail{Message} or $mail{Body} or $mail{Text}
 		(I couldn't remember which it was myself, so now it doesn't matter.)
