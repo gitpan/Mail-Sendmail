@@ -1,11 +1,23 @@
 Revision history for Perl extension Mail::Sendmail.
 
-Thanks to the people who helped between versions with suggestions or
-reporting bugs: Chris Nandor, Paul J. Schinder, "kybl", Kenneth Lee,
-Francisco, Chris Hostetter, Perrin Harkins, Tim Ward, ... and many
-others! (I can't any more keep track of all the people who send me
-usefull comments, but I do read them and thank everybody!)
+Thanks a lot to the many people who helped between versions with
+suggestions or reporting bugs. I can't any more keep track of all
+the people who send me usefull comments, but I do read them and
+thank everybody!
 
+0.78_1 11.08.2002
+       - fix old bug with dot as 77th char.
+       - correct very old bug where port number was not extracted from
+         stuff like 'my.server:2525'.
+       - fix time_to_date bug with negative half-hour zones (only Newfoundland?)
+       - use Sys::Hostname to get the hostname for HELO. (I think it has
+         been part of the standard distribution for many years now)
+       - support different envelope sender through $mail{Sender}
+       - Remove old configuration variables from version 0.74.
+       - Change case of headers: first character after "-" also uppercased
+         now, so people who believe this is required because Outlook does it
+         this way stop complaining. :-)
+       - Minor documentation changes.
 0.78  25.09.2000
       - Now accepts single-letter host/domain names in addresses. They were
         previously rejected, due to my misunderstanding of an RFC.

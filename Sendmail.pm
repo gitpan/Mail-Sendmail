@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.78 - Simple platform independent mailer
+Mail::Sendmail v. 0.78_2 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.78';
+$VERSION = '0.78_2';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -57,6 +57,7 @@ use vars qw(
 
 use Socket;
 use Time::Local; # for automatic time zone detection
+use Sys::Hostname;
 
 # use MIME::QuotedPrint if available and configured in %mailcfg
 eval("use MIME::QuotedPrint");
@@ -106,7 +107,7 @@ sub time_to_date {
     if ( $TZ eq "" ) {
         # offset in hours
         my $offset  = sprintf "%.1f", (timegm(localtime) - time) / 3600;
-        my $minutes = sprintf "%02d", ( $offset - int($offset) ) * 60;
+        my $minutes = sprintf "%02d", abs( $offset - int($offset) ) * 60;
         $TZ  = sprintf("%+03d", int($offset)) . $minutes;
     }
     return join(" ",
@@ -120,8 +121,6 @@ sub time_to_date {
 } # end sub time_to_date
 
 sub sendmail {
-    # original sendmail 1.21 by Christian Mallwitz.
-    # Modified and 'modulized' by mi@alma.ch
 
     $error = '';
     $log = "Mail::Sendmail v. $VERSION - "    . scalar(localtime()) . "\n";
@@ -151,18 +150,22 @@ sub sendmail {
 
     # redo hash, arranging keys case etc...
     while (@_) {
-        # arrange keys case
-        $k = ucfirst lc(shift @_);
-
+        $k = shift @_;
         if (!$k and $^W) {
             warn "Received false mail hash key: \'$k\'. Did you forget to put it in quotes?\n";
         }
 
+        # arrange keys case
+        $k = ucfirst lc($k);
+
         $k =~ s/\s*:\s*$//o; # kill colon (and possible spaces) at end, we add it later.
+        # uppercase also after "-", so people don't complain that headers case is different
+        # than in Outlook.
+        $k =~ s/-(.)/"-" . uc($1)/ge;
         $mail{$k} = shift @_;
     }
 
-    $smtp = $mail{'Smtp'} || $mail{'Server'} || $default_smtp_server;
+    $smtp = $mail{'Smtp'} || $mail{'Server'};
     unshift @{$mailcfg{'smtp'}}, $smtp if ($smtp and $mailcfg{'smtp'}->[0] ne $smtp);
 
     # delete non-header keys, so we don't send them later as mail headers
@@ -171,12 +174,8 @@ sub sendmail {
     # so instead:
     delete $mail{'Smtp'}; delete $mail{'Server'};
 
-    $mailcfg{'port'} = $mail{'Port'} || $default_smtp_port || $mailcfg{'port'} || 25;
+    $mailcfg{'port'} = $mail{'Port'} || $mailcfg{'port'} || 25;
     delete $mail{'Port'};
-
-    # for backward compatibility only
-    $mailcfg{'retries'} = $connect_retries if defined($connect_retries);
-    $mailcfg{'delay'} = $retry_delay if defined($retry_delay);
 
     {    # don't warn for undefined values below
         local $^W = 0;
@@ -188,7 +187,7 @@ sub sendmail {
 
     # Extract 'From:' e-mail address
 
-    $fromaddr = $mail{'From'} || $default_sender || $mailcfg{'from'};
+    $fromaddr = $mail{'Sender'} || $mail{'From'} || $mailcfg{'from'};
     unless ($fromaddr =~ /$address_rx/) {
         return fail("Bad or missing From address: \'$fromaddr\'");
     }
@@ -199,7 +198,6 @@ sub sendmail {
     $log .= "Date: $mail{Date}\n";
 
     # cleanup message, and encode if needed
-    $message =~ s/^\./\.\./gom;     # handle . as first character
     $message =~ s/\r\n/\n/go;     # normalize line endings, step 1 of 2 (next step after MIME encoding)
 
     $mail{'Mime-version'} ||= '1.0';
@@ -217,12 +215,13 @@ sub sendmail {
             if ($message =~ /[\x80-\xFF]/o) {
                 $error .= "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
                 warn "MIME::QuotedPrint not present!\n",
-                     "Sending 8bit characters, hoping it will come across OK.\n"
+                     "Sending 8bit characters without encoding, hoping it will come across OK.\n"
                      if $^W;
             }
         }
     }
 
+    $message =~ s/^\./\.\./gom;     # handle . as first character
     $message =~ s/\n/\015\012/go; # normalize line endings, step 2.
 
     # Get recipients
@@ -242,7 +241,7 @@ sub sendmail {
     }
 
     # get local hostname for polite HELO
-    $localhost = (gethostbyname('localhost'))[0] || 'localhost';
+    $localhost = hostname() || 'localhost';
 
     foreach $server ( @{$mailcfg{'smtp'}} ) {
         # open socket needs to be inside this foreach loop on Linux,
@@ -255,7 +254,7 @@ sub sendmail {
 
         $server =~ s/\s+//go; # remove spaces just in case of a typo
         # extract port if server name like "mail.domain.com:2525"
-        ($server =~ s/:(.+)$//o) ? $port = $1    : $port = $mailcfg{'port'};
+        $port = ($server =~ s/:(\d+)$//o) ? $1 : $mailcfg{'port'};
         $smtp = $server; # save $server for use outside foreach loop
 
         my $smtpaddr = inet_aton $server;
@@ -271,7 +270,7 @@ sub sendmail {
             $retried++;
             $error .= "connect to $server failed ($!)\n";
             print "- connect to $server failed ($!)\n" if $mailcfg{'debug'} > 1;
-            print "retrying in $mailcfg{'delay'} seconds...\n";
+            print "retrying in $mailcfg{'delay'} seconds...\n" if $mailcfg{'debug'} > 1;
             sleep $mailcfg{'delay'};
         }
 
@@ -311,7 +310,7 @@ sub sendmail {
     if (/^[45]/ or !$_) {
         return fail("HELO error ($_)")
     }
-    
+
     print S "mail from: <$fromaddr>\015\012";
     chomp($_ = <S>);
     if (/^[45]/ or !$_) {
@@ -388,10 +387,6 @@ __END__
 Simple platform independent e-mail from your perl script. Only requires
 Perl 5 and a network connection.
 
-After struggling for some time with various command-line mailing programs
-which never did exactly what I wanted, I put together this Perl only
-solution.
-
 Mail::Sendmail contains mainly &sendmail, which takes a hash with the
 message to send and sends it. It is intended to be very easy to setup and
 use.
@@ -421,21 +416,26 @@ Copy Sendmail.pm to Mail/ in your Perl lib directory.
 
 =item ActivePerl's PPM
 
+(This beta version is not available for PPM installs yet)
+
 ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
 
-But this way you don't get a chance to have a look at other files (Changes, 
+But this way you don't get a chance to have a look at other files (Changes,
 Todo, test.pl, ...) and PPM doesn't run the test script (test.pl).
+
+(Also, I'm not sure if it works with all ppm versions. Have yet to
+test it)
 
 =back
 
 At the top of Sendmail.pm, set your default SMTP server, unless you specify
-it with each message, or want to use the default.
+it with each message, or want to use the default (localhost).
 
 Install MIME::QuotedPrint. This is not required but strongly recommended.
 
 =head1 FEATURES
 
-Automatic time zone detection, Date: header, MIME quoted-printable encoding 
+Automatic time zone detection, Date: header, MIME quoted-printable encoding
 (if MIME::QuotedPrint installed), all of which can be overridden.
 
 Internal Bcc: and Cc: support (even on broken servers)
@@ -456,7 +456,9 @@ Doesn't work on OpenVMS.
 
 Headers are not encoded, even if they have accented characters.
 
-Since the whole message is in memory (twice!), it's not suitable for 
+No suport for the SMTP AUTH extension.
+
+Since the whole message is in memory (twice!), it's not suitable for
 sending very big attached files.
 
 The SMTP server has to be set manually in Sendmail.pm or in your script,
@@ -480,8 +482,8 @@ from your script, which will do the same thing:
 
 C<$mail{smtp} = 'my.mail.server';>
 
-A future version will try to set useful defaults for you during the
-Makefile.PL.
+A future version will (hopefully) try to set useful defaults for you
+during the Makefile.PL.
 
 =item Other configuration settings
 
@@ -579,8 +581,7 @@ down, the module tries the next one. If one of your servers uses a special
 port, add it to the server name with a colon in front, to override the
 default port (like in my.special.server:2525).
 
-Default: localhost. (the previous version also had smtp.site1.csi.com which
-was an open relay, but it isn't anymore)
+Default: localhost.
 
 =item $mailcfg{from}
 
@@ -660,10 +661,10 @@ The package version number (you can not import this one)
 
 =head2 Configuration variables from previous versions
 
-The following global variables were used in version 0.74 for configuration. 
-They should still work, but will not in a future version (unless you 
-complain loudly). Please use I<%mailcfg> if you need to access the 
-configuration from your scripts.
+The following global variables were used in version 0.74 for configuration.
+As from version 0.78_1, they are not supported anymore.
+Use the I<%mailcfg> hash if you need to access the configuration
+from your scripts.
 
 =over 4
 
@@ -680,9 +681,6 @@ configuration from your scripts.
 =item $Mail::Sendmail::retry_delay
 
 =item $Mail::Sendmail::use_MIME
-
-This one couldn't really be used in the previous version, so I just dropped it.
-It is replaced by I<$mailcfg{mime}> which works.
 
 =back
 
@@ -716,37 +714,39 @@ It is replaced by I<$mailcfg{mime}> which works.
   else { print "Error sending mail: $Mail::Sendmail::error \n" }
 
   print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
+ 
+Also see http://alma.ch/perl/Mail-Sendmail-FAQ.html for examples
+of HTML mail and sending attachments. 
 
 =head1 CHANGES
 
-Single-letter host names bug fixed since version 0.77. See the F<Changes> file for
-the full history.
+See the F<Changes> file for the full history.
 
 =head1 AUTHOR
 
-Milivoj Ivkovic mi@alma.ch or ivkovic@bluewin.ch
+Milivoj Ivkovic mi_at_alma.ch or ivkovic_at_bluewin.ch
+(replace "_at_" with "@").
 
 =head1 NOTES
 
-MIME::QuotedPrint is used by default on every message if available. It 
-allows reliable sending of accented characters, and also takes care of 
-too long lines (which can happen in HTML mails). It is available in the 
-MIME-Base64 package at http://www.perl.com/CPAN/modules/by-module/MIME/ or 
+MIME::QuotedPrint is used by default on every message if available. It
+allows reliable sending of accented characters, and also takes care of
+too long lines (which can happen in HTML mails). It is available in the
+MIME-Base64 package at http://www.perl.com/CPAN/modules/by-module/MIME/ or
 through PPM.
 
-Look at http://alma.ch/perl/Mail-Sendmail-FAQ.htm for additional info 
-(CGI, examples of sending attachments, HTML mail etc...)
+Look at http://alma.ch/perl/Mail-Sendmail-FAQ.html for additional
+info (CGI, examples of sending attachments, HTML mail etc...)
 
 You can use it freely. (Someone complained this is too vague. So, more
 precisely: do whatever you want with it, but be warned that terrible things
-will happen to you if you use it badly, like for sending spam, claiming you
-wrote it alone, or ...?)
+will happen to you if you use it badly, like for sending spam, or ...?)
 
-I would appreciate a short (or long) e-mail note if you use this (and even
-if you don't, especially if you care to say why). And of course,
-bug-reports and/or suggestions are welcome.
+Thanks to the many users who sent me feedback, bug reports, suggestions, etc.
+And please excuse me if I forgot to answer your mail. I am not always reliabe
+in answering mail. I intend to set up a mailing list soon.
 
-Last revision: 25.09.2000. Latest version should be available at
-http://alma.ch/perl/mail.htm , and a few days later on CPAN.
+Last revision: 11.08.2002. Latest version should be available at
+a CPAN site near you.
 
 =cut

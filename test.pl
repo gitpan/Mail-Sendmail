@@ -14,20 +14,16 @@ $mail{To}   = 'Sendmail Test <sendmail@alma.ch>';
 
 # if you want to get a copy of the test mail, you need to specify your
 # own server here, by name or IP address
-$server = '194.38.89.3';
+$server = 'mail.alma.ch';
 #$server = 'my.usual.mail.server';
 
 BEGIN { $| = 1; print "1..2\n"; }
 END {print "not ok 1\n" unless $loaded;}
 
-use Mail::Sendmail;
-$loaded = 1;
-print "ok 1\n";
-
 print <<EOT
 Test Mail::Sendmail $Mail::Sendmail::VERSION
 
-Try to send a message to the author (and/or whoever if you edited test.pl)
+Trying to send a message to the author (and/or whoever if you edited test.pl)
 
 (The test is designed so it can be run by Test::Harness from CPAN.pm.
 Edit it to send the mail to yourself for more concrete feedback. If you
@@ -38,6 +34,11 @@ Current recipient(s): '$mail{To}'
 
 EOT
 ;
+
+use Mail::Sendmail;
+
+$loaded = 1;
+print "ok 1\n";
 
 if ($server) {
     $mail{Smtp} = $server;
