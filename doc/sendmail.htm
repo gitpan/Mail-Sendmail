@@ -1,6 +1,6 @@
     <HTML> 
 	<HEAD> 
-	    <TITLE>Mail::Sendmail v. 0.72 - Simple platform independent mailer
+	    <TITLE>Mail::Sendmail v. 0.73 - Simple platform independent mailer
 
 </TITLE> 
 	</HEAD>
@@ -18,12 +18,12 @@
 	<LI><A HREF="#INSTALLATION">INSTALLATION</A>
 	<LI><A HREF="#FEATURES">FEATURES</A>
 	<LI><A HREF="#LIMITATIONS">LIMITATIONS</A>
-	<LI><A HREF="#USAGE_DETAILS">USAGE DETAILS</A>
+	<LI><A HREF="#DETAILS">DETAILS</A>
 	<LI><A HREF="#CONFIGURATION">CONFIGURATION</A>
 	<LI><A HREF="#ANOTHER_EXAMPLE">ANOTHER EXAMPLE</A>
 	<LI><A HREF="#CHANGES">CHANGES</A>
 	<LI><A HREF="#AUTHOR">AUTHOR</A>
-	<LI><A HREF="#NOTES">NOTES</A>
+	<LI><A HREF="#NOTES">NOTES                             </A>
 </UL>
 <!-- INDEX END -->
 
@@ -32,7 +32,7 @@
 <H3><A NAME="NAME">NAME
 
 </A></H3>
-Mail::Sendmail v. 0.72 - Simple platform independent mailer
+Mail::Sendmail v. 0.73 - Simple platform independent mailer
 
 
 <P>
@@ -77,20 +77,14 @@ Simple platform independent e-mail from your perl script.
 <P>
 
 After struggling for some time with various command-line mailing programs
-which didn't give me all the control I wanted, I found a nice script by
-Christian Mallwitz, put it into a module, and added a few features I
-wanted.
+which never did exactly what I wanted, I put together this Perl only
+solution.
 
 
 <P>
 
 Mail::Sendmail contains mainly &amp;sendmail, which takes a hash with the
 message to send and sends it...
-
-
-<P>
-
-sendmail is exported to your namespace.
 
 
 <P>
@@ -107,17 +101,16 @@ c:\Perl\lib\Mail\, c:\Perl\lib\site\Mail\, /usr/lib/perl5/site_perl/Mail/,
 
 <P>
 
-- At the top of Sendmail.pm, set your Time Zone and your default SMTP
-server
+- At the top of Sendmail.pm, set your default SMTP server
 
 
 <P>
 
-- If you want to use MIME quoted-printable encoding, you need
-MIME::QuotedPrint from CPAN. It's in the MIME-Base64 package. To get it
-with your browser go to <A
-HREF="http://www.perl.com/CPAN/modules/by-module/MIME/">http://www.perl.com/CPAN/modules/by-module/MIME/</A>
-
+- MIME::QuotedPrint is strongly recommended. It's in the MIME-Base64
+package. Get it from <A
+HREF="http://www.perl.com/CPAN/modules/by-module/MIME.">http://www.perl.com/CPAN/modules/by-module/MIME.</A>
+It is used by default on every message, and is needed to send accented
+characters safely.
 
 
 <P>
@@ -127,8 +120,7 @@ HREF="http://www.perl.com/CPAN/modules/by-module/MIME/">http://www.perl.com/CPAN
 <H3><A NAME="FEATURES">FEATURES
 
 </A></H3>
-- Automatic Mime quoted printable encoding if needed (needs
-MIME::QuotedPrint)
+- Automatic Mime quoted printable encoding (if MIME::QuotedPrint installed)
 
 
 <P>
@@ -154,7 +146,7 @@ good ones
 
 <P>
 
-- Makes verbose error messages
+- Returns verbose error messages
 
 
 <P>
@@ -164,14 +156,19 @@ good ones
 
 <P>
 
+- Automatic Time Zone detection (hopefully)
+
+
+<P>
+
 <P>
 <HR>
 <H3><A NAME="LIMITATIONS">LIMITATIONS
 
 </A></H3>
-Doesn't send attachments. You can still send them if you provide the
-appropriate headers and boundaries, but that may not be practical, and I
-haven't tested it.
+Doesn't send attachments. You can probably still send them if you provide
+the appropriate headers and boundaries, but that may not be practical, and
+I haven't tested it.
 
 
 <P>
@@ -181,24 +178,25 @@ Not tested in a situation where the server goes down during session
 
 <P>
 
-Time Zone and SMTP server have to be set manually in Sendmail.pm or in your
-script, unless you can live with the defaults.
+The SMTP server has to be set manually in Sendmail.pm or in your script,
+unless you can live with the default (Compuserve's smpt.site1.csi.com).
 
 
 <P>
 
-Time Zone has to be in numeric form (not like ``GMT'' etc...)
+I couldn't test the automatic time zone detection much. If it doesn't work,
+set it manually (see below) and please let me know.
 
 
 <P>
 
 <P>
 <HR>
-<H3><A NAME="USAGE_DETAILS">USAGE DETAILS
+<H3><A NAME="DETAILS">DETAILS
 
 </A></H3>
 <DL>
-<DT><STRONG><A NAME="item_sendmail">sendmail
+<DT><STRONG><A NAME="item_sendmail">sendmail()
 
 </A></STRONG><DD>
 sendmail is the only thing exported to your namespace
@@ -214,8 +212,8 @@ sendmail is the only thing exported to your namespace
 <P>
 
 - takes a hash containing the full message, with keys for all headers,
-Body, and optionally for another non-default SMTP server. (The Body part
-can be called ``Body'', ``Message'' or ``Text'')
+Body, and optionally for another non-default SMTP server and/or Port. (The
+Body part can be called ``Body'', ``Message'' or ``Text'')
 
 
 <P>
@@ -231,9 +229,33 @@ updates <CODE>$Mail::Sendmail::error</CODE> and <CODE>$Mail::Sendmail::log</CODE
 <P>
 
 Keys are not case-sensitive. They get normalized before use with
-<CODE>ucfirst( lc $key )</CODE>
+<CODE>ucfirst( lc $key )</CODE>. The colon after headers is not necessary.
 
 
+<P>
+
+The following headers are added unless you specify them yourself:
+
+
+<P>
+
+<PRE>    Mime-version: 1.0
+    Content-type: 'text/plain; charset=&quot;iso-8859-1&quot;'
+</PRE>
+
+<P>
+
+<PRE>    Content-transfer-encoding: quoted-printable
+    or (if MIME::QuotedPrint not installed)
+    Content-transfer-encoding: 8bit 
+    
+    Date: [string returned by time_to_date()]
+</PRE>
+
+<P>
+
+If you put an 'X-mailer' header, the package version number is appended to
+it.
 
 
 <P>
@@ -249,7 +271,8 @@ full name:
 <DT><STRONG><A NAME="item_Mail">Mail::Sendmail::time_to_date()
 
 </A></STRONG><DD>
-convert time ( as from <CODE>time()</CODE> ) to a string suitable for the Date header as per RFC 822.
+convert time ( as from <CODE>time()</CODE> ) to a string suitable for the Date header as per RFC 822. See also
+$Mail::Sendmail::TZ.
 
 
 <P>
@@ -313,10 +336,33 @@ see Configuration below
 
 <P>
 
+<DT><STRONG><A NAME="item__Mail_Sendmail_default_sender">$Mail::Sendmail::default_sender
+
+</A></STRONG><DD>
+see Configuration below
+
+
+<P>
+
 <DT><STRONG><A NAME="item__Mail_Sendmail_TZ">$Mail::Sendmail::TZ
 
 </A></STRONG><DD>
-Time Zone. see Configuration below
+Your time zone. It should be set automatically, from the difference between
+<CODE>time()</CODE> and <CODE>gmtime(),</CODE> unless it has been preset in
+Sendmail.pm.
+
+
+<P>
+
+If it doesn't work for you, let me know so I can try to fix it, and in the
+meantime, set it manually in RFC 822 compliant format:
+
+
+<P>
+
+<CODE>$Mail::Sendmail::TZ = "+0200"; # Western Europe in summer</CODE>
+
+
 
 
 <P>
@@ -327,44 +373,84 @@ Time Zone. see Configuration below
 <H3><A NAME="CONFIGURATION">CONFIGURATION
 
 </A></H3>
-At the top of Sendmail.pm, there are 2 variables you should set:
+<DL>
+<DT><STRONG><A NAME="item_default">default SMTP server (recommended setting)
+
+</A></STRONG><DD>
+Set this at the top of Sendmail.pm, unless you want to use the provided
+default.
 
 
 <P>
 
-- your Time Zone (until I change the module so it finds the TZ itself). (1
-hour for daylight savings time is added if your system says it should be)
+You can override the default in a particular script with:
 
 
 <P>
 
-- your default SMTP server.
-
-
-<P>
-
-and the port number if your server doesn't use the default port 25 (which
-would be surprising, but who knows).
-
-
-<P>
-
-If you want a different server only for a particular script put
-  <CODE>$Mail::Sendmail::default_smtp_server = 'newserver.my-domain.com';</CODE>
-in your script.
-
-
-<P>
-
-If you want a different server only for a particular message, add it to
-your <CODE>%message</CODE> hash with a key of 'Smtp':
-  <CODE>$message{Smtp} = 'newserver.my-domain.com';</CODE>
+<CODE>$Mail::Sendmail::default_smtp_server = 'newserver.my-domain.com';</CODE>
 
 
 
 
 <P>
 
+or just for a particular message by adding it to your <CODE>%message</CODE>
+hash with a key of 'Smtp':
+
+
+<P>
+
+<CODE>$message{Smtp} = 'newserver.my-domain.com';</CODE>
+
+
+
+
+<P>
+
+<DT><STRONG>default port (optional)
+
+</A></STRONG><DD>
+If your server doesn't use the default port 25, also change this at the top
+of Sendmail.pm.
+
+
+<P>
+
+Or override it for a particular script with:
+
+
+<P>
+
+<CODE>$Mail::Sendmail::default_smtp_port = 8025;</CODE>
+
+
+
+
+<P>
+
+or just for a particular message by adding it to your <CODE>%message</CODE>
+hash with a key of 'Port':
+
+
+<P>
+
+<CODE>$message{Port} = 8025;</CODE>
+
+
+
+
+<P>
+
+<DT><STRONG><A NAME="item__default_sender">$default_sender (optional)
+
+</A></STRONG><DD>
+If you set this, you don't need to define %message{From} in every message.
+
+
+<P>
+
+</DL>
 <P>
 <HR>
 <H3><A NAME="ANOTHER_EXAMPLE">ANOTHER EXAMPLE
@@ -382,9 +468,11 @@ your <CODE>%message</CODE> hash with a key of 'Smtp':
 
 <P>
 
-<PRE>  %mail = (
+<PRE>  $Mail::Sendmail::default_sender = 'This is me &lt;myself@here.com&gt;';
+  
+  %mail = (
       #To      =&gt; 'No to field this time, only Bcc and Cc',
-      From    =&gt; 'Myself &lt;me@here.com&gt;',
+      #From    =&gt; 'not needed, use default',
       Bcc     =&gt; 'Someone &lt;him@there.com&gt;, Someone else her@there.com',
       # only addresses are extracted from Bcc, real names disregarded
       Cc      =&gt; 'Yet someone else &lt;xz@whatever.com&gt;',
@@ -420,6 +508,14 @@ your <CODE>%message</CODE> hash with a key of 'Smtp':
 <H3><A NAME="CHANGES">CHANGES
 
 </A></H3>
+0.73: Line endings changed again to hopefully be Mac compatible at last.
+Automatic time zone detection. Support for SMTP Port change for single
+messages. Always default to quoted-printable encoding if possible. Added
+$Mail::Sendmail::default_sender.
+
+
+<P>
+
 0.72: Fixed line endings in Body to ``\r\n''. MIME quoted printable
 encoding is now automatic if needed. Test script can now run unattended.
 
@@ -445,16 +541,22 @@ HREF="MAILTO:ivkovic@csi.com">ivkovic@csi.com</A>
 
 <P>
 <HR>
-<H3><A NAME="NOTES">NOTES
+<H3><A NAME="NOTES">NOTES                             
 
 </A></H3>
-You can use this freely.
+This module was first based on a script by Christian Mallwitz.
 
 
 <P>
 
-I would appreciate a short (or long) e-mail note if you do. And of course,
-bug-reports and/or improvements are welcome.
+You can use it freely.
+
+
+<P>
+
+I would appreciate a short (or long) e-mail note if you do (and even if you
+don't, especially if you care to say why). And of course, bug-reports
+and/or suggestions are welcome.
 
 
 <P>
@@ -466,8 +568,9 @@ This version has been tested on Win95 and WinNT 4.0 with Perl 5.003_07 (AS
 
 <P>
 
-Last revision: 08.07.98. Latest version should be available at <A
-HREF="http://alma.ch/perl/mail.htm">http://alma.ch/perl/mail.htm</A>
+Last revision: 13.07.98. Latest version should be available at <A
+HREF="http://alma.ch/perl/mail.htm,">http://alma.ch/perl/mail.htm,</A> and
+a few days later on CPAN.
 
 
 <P>
