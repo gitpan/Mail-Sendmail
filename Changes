@@ -4,7 +4,11 @@ Thanks to the people who helped between versions with suggestions or
 reporting bugs: Chris Nandor, Paul J. Schinder, "kybl", Kenneth Lee,
 Francisco, Chris Hostetter, Perrin Harkins, Tim Ward, ...
 
-0.75
+0.76  27.03.99
+      - fixed bug which prevented trying other servers in list if
+        connection to first failed.
+      - fixed reporting of server in log.
+0.75  27.03.99
       - you can now send attachments, html mail etc... your headers will
         be left alone.
       - can use a list of possible SMTP servers instead of a single one.

@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.75 - Simple platform independent mailer
+Mail::Sendmail v. 0.76 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.75';
+$VERSION = '0.76';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -29,7 +29,7 @@ $VERSION = '0.75';
 
     'tz'      => '', # only to override automatic detection
     'port'    => 25, # change it if you always use a non-standard port
-    'debug'   => 5 # prints stuff to STDERR
+    'debug'   => 0 # prints stuff to STDERR
 );
 
 # *******************************************************************
@@ -130,7 +130,7 @@ sub sendmail {
     local $/ = "\015\012";
 
     my (%mail, $k,
-        $smtp, $port,
+        $smtp, $server, $port,
         $message, $fromaddr, $recip, @recipients, $to, $header,
         $smtpaddr, $localhost,
        );
@@ -250,39 +250,43 @@ sub sendmail {
         return fail("socket failed ($!)")
     }
 
-    foreach $smtp ( @{$mailcfg{'smtp'}} ) {
-        $smtp =~ s/\s+//go; # remove spaces just in case of a typo
+    my $connected = 0;
+    foreach $server ( @{$mailcfg{'smtp'}} ) {
+    	print "- trying $server\n" if $mailcfg{'debug'} > 1;
+        $server =~ s/\s+//go; # remove spaces just in case of a typo
         # extract port if server name like "mail.domain.com:2525"
-        ($smtp =~ s/:(.+)$//o) ? $port = $1    : $port = $mailcfg{'port'};
-
-        $smtpaddr = inet_aton $smtp;
+        ($server =~ s/:(.+)$//o) ? $port = $1    : $port = $mailcfg{'port'};
+		$smtp = $server; # so we have $smtp after the foreach
+        $smtpaddr = inet_aton $server;
         unless ($smtpaddr) {
-            $error .= "$smtp not found\n";
+            $error .= "$server not found\n";
             next; # next server
         }
 
         # connect sometimes failed with no obvious reason.
         # maybe retries can help?
         my $retried = 0;
-        while ( (not connect S, pack_sockaddr_in($port, $smtpaddr))
-            and ($retried <= $mailcfg{'retries'})
+        while ( (not $connected = connect S, pack_sockaddr_in($port, $smtpaddr) )
+            and ($retried < $mailcfg{'retries'})
               ) {
             $retried++;
-            $error .= "connect to $smtp failed ($!)\n";
-               print "retrying in $mailcfg{'delay'} seconds...\n";
-               sleep $mailcfg{'delay'};
+            $error .= "connect to $server failed ($!)\n";
+            print "- connect to $server failed ($!)\n" if $mailcfg{'debug'} > 1;
+            print "retrying in $mailcfg{'delay'} seconds...\n";
+            sleep $mailcfg{'delay'};
         }
 
-        if ( defined *S ) {
+        if ( $connected ) {
             last;
         }
         else {
-            $error .= "connect to $smtp failed\n";
+            $error .= "connect to $server failed\n";
+            print "- connect to $server failed, next server...\n" if $mailcfg{'debug'} > 1;
             next; # next server
         }
     }
 
-    unless ( defined *S ) {
+    unless ( $connected ) {
         return fail("connect to $smtp failed ($!) no (more) retries!")
     };
 
