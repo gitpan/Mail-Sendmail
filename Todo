@@ -1,7 +1,8 @@
+Check on older Perl
+
 # random thoughts about what to do next.
 # suggestions welcome
 
-- document $mail{Sender}
 - support SMTP AUTH
 
 - Check with mod_perl

@@ -5,6 +5,7 @@ WriteMakefile(
     'NAME'    => 'Mail::Sendmail',
     'VERSION_FROM' => 'Sendmail.pm', # finds $VERSION
     'dist' => { COMPRESS=>"gzip", SUFFIX=>"gz" },
+#Do these cause trouble to old versions of PPM ? Check!
 #    'PREREQ_PM'  => {
 #        'Time::Local'   => 0,
 #        'Socket'        => 0,
@@ -14,8 +15,10 @@ WriteMakefile(
         ? (
             'AUTHOR' => 'Milivoj Ivkovic <mi _at_ alma.ch>',
             'ABSTRACT' => 'Simple platform independent mailer',
+## how can I get the version MakeMaker found ?
 #            'BINARY_LOCATION' => "http://alma.ch/perl/ppm/Mail-Sendmail-$VERSION-PPM.tar.gz",
             'PPM_INSTALL_SCRIPT' => 'test.pl',
+			# add install exe! (PPM_INSTALL_EXEC ?)
            )
          : (),
 

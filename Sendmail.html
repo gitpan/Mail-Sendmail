@@ -1,6 +1,6 @@
 <HTML>
 <HEAD>
-<TITLE>0.78_5 - Simple platform independent mailer</TITLE>
+<TITLE>0.78_6 - Simple platform independent mailer</TITLE>
 <LINK REV="made" HREF="mailto:root@net1.alma.ch">
 </HEAD>
 
@@ -41,7 +41,7 @@
 <HR>
 <P>
 <H1><A NAME="name">NAME</A></H1>
-<P>Mail::Sendmail v. 0.78_5 - Simple platform independent mailer</P>
+<P>Mail::Sendmail v. 0.78_6 - Simple platform independent mailer</P>
 <P>
 <HR>
 <H1><A NAME="synopsis">SYNOPSIS</A></H1>
@@ -83,18 +83,16 @@ use. See also <A HREF="#features">FEATURES</A> below.</P>
 <DD>
 Copy Sendmail.pm to Mail/ in your Perl lib directory.
 <PRE>
-    (eg. c:\Perl\lib\Mail\, c:\Perl\site\lib\Mail\,
-     /usr/lib/perl5/site_perl/Mail/, ... or whatever it
-     is on your system)</PRE>
+    (eg. c:\Perl\site\lib\Mail\
+     or  /usr/lib/perl5/site_perl/Mail/
+     or whatever it is on your system.
+     They are listed when you type C&lt; perl -V &gt;)</PRE>
 <P></P>
 <DT><STRONG><A NAME="item_ActivePerl%27s_PPM">ActivePerl's PPM</A></STRONG><BR>
 <DD>
-(This beta version is not available for PPM installs yet)
-<P>ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail</P>
+ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
 <P>But this way you don't get a chance to have a look at other files (Changes,
-Todo, test.pl, ...) and PPM doesn't run the test script (test.pl).</P>
-<P>(Also, I'm not sure if it works with all ppm versions. Have yet to
-test it)</P>
+Todo, test.pl, ...).</P>
 <P></P></DL>
 <P>At the top of Sendmail.pm, set your default SMTP server(s), unless you specify
 it with each message, or want to use the default (localhost).</P>
@@ -116,7 +114,7 @@ down</P>
 <H1><A NAME="limitations">LIMITATIONS</A></H1>
 <P>Headers are not encoded, even if they have accented characters.</P>
 <P>No suport for the SMTP AUTH extension.</P>
-<P>Since the whole message is in memory (twice!), it's not suitable for
+<P>Since the whole message is in memory, it's not suitable for
 sending very big attached files.</P>
 <P>The SMTP server has to be set manually in Sendmail.pm or in your script,
 unless you have a mail server on localhost.</P>
@@ -160,17 +158,19 @@ body, and optionally for another non-default SMTP server and/or port.</P>
 this one fails, the other ones in <A HREF="#item_%24mailcfg%7Bsmtp%7D"><CODE>$mailcfg{smtp}</CODE></A> will still be tried.</P>
 <P>The following headers are added unless you specify them yourself:</P>
 <PRE>
-    Mime-version: 1.0
-    Content-type: 'text/plain; charset=&quot;iso-8859-1&quot;'</PRE>
+    Mime-Version: 1.0
+    Content-Type: 'text/plain; charset=&quot;iso-8859-1&quot;'</PRE>
 <PRE>
-    Content-transfer-encoding: quoted-printable
+    Content-Transfer-Encoding: quoted-printable
     or (if MIME::QuotedPrint not installed)
-    Content-transfer-encoding: 8bit</PRE>
+    Content-Transfer-Encoding: 8bit</PRE>
 <PRE>
     Date: [string returned by time_to_date()]</PRE>
+<P>If you wish to use an envelope sender address different than the
+From: address, set <CODE>$mail{Sender}</CODE> in your %mail hash.</P>
 <P>The following are not exported by default, but you can still access them
 with their full name, or request their export on the use line like in:
-<CODE>use Mail::Sendmail qw($address_rx time_to_date);</CODE></P>
+<CODE>use Mail::Sendmail qw(sendmail $address_rx time_to_date);</CODE></P>
 <P>
 <H2><A NAME="mail::sendmail::time_to_date()">Mail::Sendmail::time_to_date()</A></H2>
 <P>convert time ( as from <CODE>time()</CODE> ) to an RFC 822 compliant string for the
@@ -269,7 +269,7 @@ which do not use daylight savings time: see Microsoft KB article Q148681)</P>
 <P></P>
 <DT><STRONG><A NAME="item_%24mailcfg%7Bdebug%7D">$mailcfg{debug}</A></STRONG><BR>
 <DD>
-<CODE>$mailcfg{debug} =</CODE> 0;&gt;
+<CODE>$mailcfg{debug} = 0;</CODE>
 <P>Prints stuff to STDERR. Current maximum is 6, which prints the whole SMTP
 session, except data exceeding 500 bytes.</P>
 <P>Default: 0;</P>
@@ -338,12 +338,30 @@ of HTML mail and sending attachments.</PRE>
 <P>
 <HR>
 <H1><A NAME="changes">CHANGES</A></H1>
-<P>See the <EM>Changes</EM> file for the full history.</P>
+<P>Main changes since version 0.78:</P>
+<P>Added ``/'' (\x2F) as a valid character in mailbox part.</P>
+<P>Removed old configuration variables which are not used anymore
+since version 0.74.</P>
+<P>Added support for different envelope sender (through <CODE>$mail{Sender}</CODE>)</P>
+<P>Changed case of headers: first character after ``-'' also uppercased</P>
+<P>Support for multi-line server responses</P>
+<P>Localized $\ and $_</P>
+<P>Some internal rewrites and documentation updates</P>
+<P>Fixed old bug of dot as 76th character on line disappearing.</P>
+<P>Fixed very old bug where port number was not extracted from
+stuff like 'my.server:2525'.</P>
+<P>Fixed time_to_date bug with negative half-hour zones (only Newfoundland?)</P>
+<P>Added seconds to date string</P>
+<P>Now uses Sys::Hostname to get the hostname for HELO. (This may break the
+module on some very old Win32 Perls where Sys::Hostname was broken)</P>
+<P>Enable full session output for debugging</P>
+<P>See the <EM>Changes</EM> file for the full history. If you don't have it
+because you installed through PPM, you can also find the latest
+one on <EM><A HREF="http://alma.ch/perl/scripts/Sendmail/Changes">http://alma.ch/perl/scripts/Sendmail/Changes</A></EM>.</P>
 <P>
 <HR>
 <H1><A NAME="author">AUTHOR</A></H1>
-<P>Milivoj Ivkovic mi_at_alma.ch or ivkovic_at_bluewin.ch
-(replace ``_at_'' with ``@'').</P>
+<P>Milivoj Ivkovic &lt;mi\x40alma.ch&gt; (``\x40'' is ``@'' of course)</P>
 <P>
 <HR>
 <H1><A NAME="notes">NOTES</A></H1>
@@ -354,14 +372,15 @@ MIME-Base64 package at <A HREF="http://www.perl.com/CPAN/modules/by-module/MIME/
 through PPM.</P>
 <P>Look at <A HREF="http://alma.ch/perl/Mail-Sendmail-FAQ.html">http://alma.ch/perl/Mail-Sendmail-FAQ.html</A> for additional
 info (CGI, examples of sending attachments, HTML mail etc...)</P>
-<P>You can use it freely. (Someone complained this is too vague. So, more
-precisely: do whatever you want with it, but be warned that terrible things
-will happen to you if you use it badly, like for sending spam, or ...?)</P>
+<P>You can use this module freely. (Someone complained this is too vague.
+So, more precisely: do whatever you want with it, but be warned that
+terrible things will happen to you if you use it badly, like for sending
+spam, or ...?)</P>
 <P>Thanks to the many users who sent me feedback, bug reports, suggestions, etc.
 And please excuse me if I forgot to answer your mail. I am not always reliabe
 in answering mail. I intend to set up a mailing list soon.</P>
-<P>Last revision: 11.08.2002. Latest version should be available at
-a CPAN site near you.</P>
+<P>Last revision: 06.02.2003. Latest version should be available on
+CPAN: <EM><A HREF="http://www.cpan.org/modules/by-authors/id/M/MI/MIVKOVIC/">http://www.cpan.org/modules/by-authors/id/M/MI/MIVKOVIC/</A></EM>.</P>
 
 </BODY>
 

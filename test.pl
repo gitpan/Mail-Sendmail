@@ -1,4 +1,4 @@
-#!perl -w
+#!/usr/bin/perl -w
 
 # unattended Mail::Sendmail test, sends a message to the author
 # but you probably want to change $mail{To} below

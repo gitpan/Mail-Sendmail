@@ -1,15 +1,15 @@
 package Mail::Sendmail;
-# Mail::Sendmail by Milivoj Ivkovic <mi@alma.ch>
+# Mail::Sendmail by Milivoj Ivkovic <mi\x40alma.ch>
 # see embedded POD documentation after __END__
-# or http://alma.ch/perl/mail.htm
+# or http://alma.ch/perl/mail.html
 
 =head1 NAME
 
-Mail::Sendmail v. 0.78_5 - Simple platform independent mailer
+Mail::Sendmail v. 0.78_6 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.78_5';
+$VERSION = '0.78_6';
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -42,11 +42,6 @@ use vars qw(
             @EXPORT
             @EXPORT_OK
             %mailcfg
-            $default_smtp_server
-            $default_smtp_port
-            $default_sender
-            $TZ
-            $use_MIME
             $address_rx
             $debug
             $log
@@ -68,10 +63,6 @@ $mailcfg{'mime'} &&= (!$@);
 @EXPORT_OK  = qw(
                  %mailcfg
                  time_to_date
-                 $default_smtp_server
-                 $default_smtp_port
-                 $default_sender
-                 $TZ
                  $address_rx
                  $debug
                  $log
@@ -81,7 +72,7 @@ $mailcfg{'mime'} &&= (!$@);
 # regex for e-mail addresses where full=$1, user=$2, domain=$3
 # see pod documentation about this regex
 
-my $word_rx = '[\x21\x23-\x27\x2A-\x2B\x2D\w\x3D\x3F]+';
+my $word_rx = '[\x21\x23-\x27\x2A-\x2B\x2D\x2F\w\x3D\x3F]+';
 my $user_rx = $word_rx         # valid chars
              .'(?:\.' . $word_rx . ')*' # possibly more words preceded by a dot
              ;
@@ -89,7 +80,7 @@ my $dom_rx = '\w[-\w]*(?:\.\w[-\w]*)*'; # less valid chars in domain names
 my $ip_rx = '\[\d{1,3}(?:\.\d{1,3}){3}\]';
 
 $address_rx = '((' . $user_rx . ')\@(' . $dom_rx . '|' . $ip_rx . '))';
-; # v. 0.6
+; # v. 0.61
 
 sub time_to_date {
     # convert a time() value to a date-time string according to RFC 822
@@ -102,8 +93,7 @@ sub time_to_date {
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
         = localtime($time);
 
-    $TZ ||= $mailcfg{'tz'};
-
+    my $TZ = $mailcfg{'tz'};
     if ( $TZ eq "" ) {
         # offset in hours
         my $offset  = sprintf "%.1f", (timegm(localtime) - time) / 3600;
@@ -115,7 +105,7 @@ sub time_to_date {
                      $mday,
                      $months[$mon],
                      $year+1900,
-                     sprintf("%02d", $hour) . ":" . sprintf("%02d", $min),
+                     sprintf("%02d:%02d:%02d", $hour, $min, $sec),
                      $TZ
                );
 } # end sub time_to_date
@@ -435,21 +425,17 @@ C<perl -MCPAN -e "install Mail::Sendmail">
 
 Copy Sendmail.pm to Mail/ in your Perl lib directory.
 
-    (eg. c:\Perl\lib\Mail\, c:\Perl\site\lib\Mail\,
-     /usr/lib/perl5/site_perl/Mail/, ... or whatever it
-     is on your system)
+    (eg. c:\Perl\site\lib\Mail\
+     or  /usr/lib/perl5/site_perl/Mail/
+     or whatever it is on your system.
+     They are listed when you type C< perl -V >)
 
 =item ActivePerl's PPM
-
-(This beta version is not available for PPM installs yet)
 
 ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
 
 But this way you don't get a chance to have a look at other files (Changes,
-Todo, test.pl, ...) and PPM doesn't run the test script (test.pl).
-
-(Also, I'm not sure if it works with all ppm versions. Have yet to
-test it)
+Todo, test.pl, ...).
 
 =back
 
@@ -481,7 +467,7 @@ Headers are not encoded, even if they have accented characters.
 
 No suport for the SMTP AUTH extension.
 
-Since the whole message is in memory (twice!), it's not suitable for
+Since the whole message is in memory, it's not suitable for
 sending very big attached files.
 
 The SMTP server has to be set manually in Sendmail.pm or in your script,
@@ -541,18 +527,21 @@ this one fails, the other ones in C<$mailcfg{smtp}> will still be tried.
 
 The following headers are added unless you specify them yourself:
 
-    Mime-version: 1.0
-    Content-type: 'text/plain; charset="iso-8859-1"'
+    Mime-Version: 1.0
+    Content-Type: 'text/plain; charset="iso-8859-1"'
 
-    Content-transfer-encoding: quoted-printable
+    Content-Transfer-Encoding: quoted-printable
     or (if MIME::QuotedPrint not installed)
-    Content-transfer-encoding: 8bit
+    Content-Transfer-Encoding: 8bit
 
     Date: [string returned by time_to_date()]
 
+If you wish to use an envelope sender address different than the
+From: address, set C<$mail{Sender}> in your %mail hash.
+
 The following are not exported by default, but you can still access them
 with their full name, or request their export on the use line like in:
-C<use Mail::Sendmail qw($address_rx time_to_date);>
+C<use Mail::Sendmail qw(sendmail $address_rx time_to_date);>
 
 =head2 Mail::Sendmail::time_to_date()
 
@@ -674,7 +663,7 @@ Default: 25.
 
 =item $mailcfg{debug}
 
-C<$mailcfg{debug} => 0;>
+C<$mailcfg{debug} = 0;>
 
 Prints stuff to STDERR. Current maximum is 6, which prints the whole SMTP
 session, except data exceeding 500 bytes.
@@ -748,12 +737,44 @@ of HTML mail and sending attachments.
 
 =head1 CHANGES
 
-See the F<Changes> file for the full history.
+Main changes since version 0.78:
+
+Added "/" (\x2F) as a valid character in mailbox part.
+
+Removed old configuration variables which are not used anymore
+since version 0.74.
+
+Added support for different envelope sender (through C<$mail{Sender}>)
+
+Changed case of headers: first character after "-" also uppercased
+
+Support for multi-line server responses
+
+Localized $\ and $_
+
+Some internal rewrites and documentation updates
+
+Fixed old bug of dot as 76th character on line disappearing.
+
+Fixed very old bug where port number was not extracted from
+stuff like 'my.server:2525'.
+
+Fixed time_to_date bug with negative half-hour zones (only Newfoundland?)
+
+Added seconds to date string
+
+Now uses Sys::Hostname to get the hostname for HELO. (This may break the
+module on some very old Win32 Perls where Sys::Hostname was broken)
+
+Enable full session output for debugging
+
+See the F<Changes> file for the full history. If you don't have it
+because you installed through PPM, you can also find the latest
+one on F<http://alma.ch/perl/scripts/Sendmail/Changes>.
 
 =head1 AUTHOR
 
-Milivoj Ivkovic mi_at_alma.ch or ivkovic_at_bluewin.ch
-(replace "_at_" with "@").
+Milivoj Ivkovic <mi\x40alma.ch> ("\x40" is "@" of course)
 
 =head1 NOTES
 
@@ -766,15 +787,16 @@ through PPM.
 Look at http://alma.ch/perl/Mail-Sendmail-FAQ.html for additional
 info (CGI, examples of sending attachments, HTML mail etc...)
 
-You can use it freely. (Someone complained this is too vague. So, more
-precisely: do whatever you want with it, but be warned that terrible things
-will happen to you if you use it badly, like for sending spam, or ...?)
+You can use this module freely. (Someone complained this is too vague.
+So, more precisely: do whatever you want with it, but be warned that
+terrible things will happen to you if you use it badly, like for sending
+spam, or ...?)
 
 Thanks to the many users who sent me feedback, bug reports, suggestions, etc.
 And please excuse me if I forgot to answer your mail. I am not always reliabe
 in answering mail. I intend to set up a mailing list soon.
 
-Last revision: 11.08.2002. Latest version should be available at
-a CPAN site near you.
+Last revision: 06.02.2003. Latest version should be available on
+CPAN: F<http://www.cpan.org/modules/by-authors/id/M/MI/MIVKOVIC/>.
 
 =cut

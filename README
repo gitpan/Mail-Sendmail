@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.78_5 - Simple platform independent mailer
+    Mail::Sendmail v. 0.78_6 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -34,21 +34,16 @@ INSTALLATION
     Manual
         Copy Sendmail.pm to Mail/ in your Perl lib directory.
 
-            (eg. c:\Perl\lib\Mail\, c:\Perl\site\lib\Mail\,
-             /usr/lib/perl5/site_perl/Mail/, ... or whatever it
-             is on your system)
+            (eg. c:\Perl\site\lib\Mail\
+             or  /usr/lib/perl5/site_perl/Mail/
+             or whatever it is on your system.
+             They are listed when you type C< perl -V >)
 
     ActivePerl's PPM
-        (This beta version is not available for PPM installs yet)
-
         ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
 
         But this way you don't get a chance to have a look at other files
-        (Changes, Todo, test.pl, ...) and PPM doesn't run the test script
-        (test.pl).
-
-        (Also, I'm not sure if it works with all ppm versions. Have yet to
-        test it)
+        (Changes, Todo, test.pl, ...).
 
     At the top of Sendmail.pm, set your default SMTP server(s), unless you
     specify it with each message, or want to use the default (localhost).
@@ -78,8 +73,8 @@ LIMITATIONS
 
     No suport for the SMTP AUTH extension.
 
-    Since the whole message is in memory (twice!), it's not suitable for
-    sending very big attached files.
+    Since the whole message is in memory, it's not suitable for sending very
+    big attached files.
 
     The SMTP server has to be set manually in Sendmail.pm or in your script,
     unless you have a mail server on localhost.
@@ -133,18 +128,21 @@ DETAILS
 
     The following headers are added unless you specify them yourself:
 
-        Mime-version: 1.0
-        Content-type: 'text/plain; charset="iso-8859-1"'
+        Mime-Version: 1.0
+        Content-Type: 'text/plain; charset="iso-8859-1"'
 
-        Content-transfer-encoding: quoted-printable
+        Content-Transfer-Encoding: quoted-printable
         or (if MIME::QuotedPrint not installed)
-        Content-transfer-encoding: 8bit
+        Content-Transfer-Encoding: 8bit
 
         Date: [string returned by time_to_date()]
 
+    If you wish to use an envelope sender address different than the From:
+    address, set `$mail{Sender}' in your %mail hash.
+
     The following are not exported by default, but you can still access them
     with their full name, or request their export on the use line like in:
-    `use Mail::Sendmail qw($address_rx time_to_date);'
+    `use Mail::Sendmail qw(sendmail $address_rx time_to_date);'
 
   Mail::Sendmail::time_to_date()
 
@@ -260,7 +258,7 @@ DETAILS
         Default: 25.
 
     $mailcfg{debug}
-        `$mailcfg{debug} =' 0;>
+        `$mailcfg{debug} = 0;'
 
         Prints stuff to STDERR. Current maximum is 6, which prints the whole
         SMTP session, except data exceeding 500 bytes.
@@ -318,11 +316,44 @@ ANOTHER EXAMPLE
     mail and sending attachments.
 
 CHANGES
-    See the Changes file for the full history.
+    Main changes since version 0.78:
+
+    Added "/" (\x2F) as a valid character in mailbox part.
+
+    Removed old configuration variables which are not used anymore since
+    version 0.74.
+
+    Added support for different envelope sender (through `$mail{Sender}')
+
+    Changed case of headers: first character after "-" also uppercased
+
+    Support for multi-line server responses
+
+    Localized $\ and $_
+
+    Some internal rewrites and documentation updates
+
+    Fixed old bug of dot as 76th character on line disappearing.
+
+    Fixed very old bug where port number was not extracted from stuff like
+    'my.server:2525'.
+
+    Fixed time_to_date bug with negative half-hour zones (only
+    Newfoundland?)
+
+    Added seconds to date string
+
+    Now uses Sys::Hostname to get the hostname for HELO. (This may break the
+    module on some very old Win32 Perls where Sys::Hostname was broken)
+
+    Enable full session output for debugging
+
+    See the Changes file for the full history. If you don't have it because
+    you installed through PPM, you can also find the latest one on
+    http://alma.ch/perl/scripts/Sendmail/Changes.
 
 AUTHOR
-    Milivoj Ivkovic mi_at_alma.ch or ivkovic_at_bluewin.ch (replace "_at_"
-    with "@").
+    Milivoj Ivkovic <mi\x40alma.ch> ("\x40" is "@" of course)
 
 NOTES
     MIME::QuotedPrint is used by default on every message if available. It
@@ -334,16 +365,16 @@ NOTES
     Look at http://alma.ch/perl/Mail-Sendmail-FAQ.html for additional info
     (CGI, examples of sending attachments, HTML mail etc...)
 
-    You can use it freely. (Someone complained this is too vague. So, more
-    precisely: do whatever you want with it, but be warned that terrible
-    things will happen to you if you use it badly, like for sending spam, or
-    ...?)
+    You can use this module freely. (Someone complained this is too vague.
+    So, more precisely: do whatever you want with it, but be warned that
+    terrible things will happen to you if you use it badly, like for sending
+    spam, or ...?)
 
     Thanks to the many users who sent me feedback, bug reports, suggestions,
     etc. And please excuse me if I forgot to answer your mail. I am not
     always reliabe in answering mail. I intend to set up a mailing list
     soon.
 
-    Last revision: 11.08.2002. Latest version should be available at a CPAN
-    site near you.
+    Last revision: 06.02.2003. Latest version should be available on CPAN:
+    http://www.cpan.org/modules/by-authors/id/M/MI/MIVKOVIC/.
 

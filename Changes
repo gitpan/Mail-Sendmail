@@ -5,9 +5,18 @@ suggestions or reporting bugs. I can't any more keep track of all
 the people who send me usefull comments, but I do read them and
 thank everybody!
 
-0.78_5 23.08.2002
+0.78_6 06.02.2003
+       - Remove old configuration variables from version 0.74.
+       - document $mail{Sender}
+       - add seconds to Date header (some buggy mailers freak out if
+         the time has no seconds)
+       - added "/" (\x2F) as a valid character in mailbox part.
+       - minor documentation updates
+
+0.78_5 24.08.2002
        - Adapt reference to mail headers in module to new case convention
          (bug introduced in 0.78_2).
+       - ppd and PPM install changes...
 
 0.78_4 
          no change in module, only in PPM distribution
@@ -28,11 +37,11 @@ thank everybody!
        - use Sys::Hostname to get the hostname for HELO. (I think it has
          been part of the standard distribution for many years now)
        - support different envelope sender through $mail{Sender}
-       - Remove old configuration variables from version 0.74.
        - Change case of headers: first character after "-" also uppercased
          now, so people who believe this is required because Outlook does it
          this way stop complaining. :-)
        - Enable full session output for debugging
+       - Do not copy the mail message again to a different variable.
        - Minor documentation changes.
 
 0.78  25.09.2000
