@@ -1,5 +1,26 @@
 Revision history for Perl extension Mail::Sendmail.
 
+Thanks to the people who helped between versions with suggestions or
+reporting bugs: Chris Nandor, Paul J. Schinder, "kybl", Kenneth Lee,
+Francisco, Chris Hostetter, Perrin Harkins, Tim Ward, ...
+
+0.75
+      - you can now send attachments, html mail etc... your headers will
+        be left alone.
+      - can use a list of possible SMTP servers instead of a single one.
+      - all configuration now grouped in a %mailcfg hash.
+      - removes possible extra line-endings in headers.
+      - e-mail address regex changes:
+        . now accepts user@[xxx.xxx.xxx.xxx]
+        . now refuses commas (they are only valid in quoted strings
+          which $address_rx does not support). Comma separated
+          recipients lists now work even with no space after the comma.
+      - if you used an X-mailer header, the Mail::Sendmail vwersion was
+        appended. It isn't any more.
+      - removed unnecessary BEGIN{} block.
+      - no more warnings on empty Subject.
+      - lots's of cleaning up in the code.
+        
 0.74  Fri Jul 31 14:50:54 1998
       - Fixed $/ problem: mailing would hang if caller had redefined
         the record separator. It's now locally set to "\015\012". 

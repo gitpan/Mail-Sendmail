@@ -5,6 +5,13 @@ WriteMakefile(
     'NAME'	=> 'Mail::Sendmail',
     'VERSION_FROM' => 'Sendmail.pm', # finds $VERSION 
     'dist' => { COMPRESS=>"gzip", SUFFIX=>"gz" },
+    ($] ge '5.005')
+	    ? (
+            'AUTHOR' => 'Milivoj Ivkovic <mi@alma.ch>',
+            'ABSTRACT' => 'Simple platform independent mailer',
+           )
+         : (),
+    
 );
 
 print <<EOT

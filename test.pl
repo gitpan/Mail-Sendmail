@@ -4,9 +4,9 @@
 # but you probably want to change $mail{To} below
 # to send the message to yourself.
 
-$mail{From} = 'Sendmail Test <ivkovic@csi.com>'; 
-$mail{To}   = 'Sendmail Test <mi@alma.ch>';
-#$mail{To}   = 'Sendmail Test <mi@alma.ch>, You me@myaddress';
+$mail{From} = 'Sendmail Test <sendmail@alma.ch>'; 
+$mail{To}   = 'Sendmail Test <sendmail@alma.ch>';
+#$mail{To}   = 'Sendmail Test <sendmail@alma.ch>, You me@myaddress';
 #$server = 'use.your.own.smtp.server';
 
 BEGIN { $| = 1; print "1..2\n"; }
@@ -28,7 +28,6 @@ Try to send a message to the author (and/or whoever if you edited test.pl)
 
 Current recipient(s): '$mail{To}'
 
-The default mail server is $Mail::Sendmail::default_smtp_server
 EOT
 ;
 

@@ -2,7 +2,7 @@ Changes
 MANIFEST
 Makefile.PL
 README
+Sendmail.html
 Sendmail.pm
-Todo
-doc/sendmail.htm
 test.pl
+Todo

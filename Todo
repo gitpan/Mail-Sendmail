@@ -1,26 +1,22 @@
 # random thoughts about what to do next.
 # suggestions welcome
 
-Check it with Perl 5.005 and threads
+Also MIME-encode headers if they contain accented characters
 
-Try to ask user for local configuration info during Makefile.PL, and
-automatically update Sendmail.pm itself from there.
+Make a .ppd package for ActivePerl
 
-Find out more about address and domain name syntax, and do a better
-$address_rx, or forget it and make it a sub?
+During Makefile.PL, try to find a local SMTP server and the user's e-mail 
+address, and offer to pre-configure these as defaults in Sendmail.pm. And 
+let the user enter defaults to override automatic detection.
 
 Document $address_rx: which addresses it finds OK, and which not.
 
-See if Net:SMTP works on older AS ports on Win95, and if it is easy
-enough to install without make. If so, consider using it for the real
-work.
+Use 8BITMIME if available from server?
 
-use 8BITMIME if available from server?
+Encode only if accented chars really present?
 
-encode only if accented chars really present?
+Add example scripts for CGI forms
 
-encode with Base64 if Message is binary? But that is almost doing
-attachments.
+Rename to Mail::Simple?
 
-Do simple attachments? But Mail::Sender does this, so probably don't
-bother unless people ask for it...
+Setup Perl on an Amiga and see if it runs. (it should)
