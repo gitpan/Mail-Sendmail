@@ -1,0 +1,186 @@
+NAME
+    Mail::Sendmail v. 0.69 - sends mail... (would you believe it)
+
+SYNOPSIS
+      use Mail::Sendmail;
+
+      %mail = ( To      => 'you@there.com',
+                From    => 'me@here.com',
+                Message => "Minimal message, with only To: and From: fields"
+               );
+
+      if (sendmail %mail) { print "Mail sent OK.\n" }
+      else { print "Error sending mail: $Mail::Sendmail::error \n" }
+
+      print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
+
+DESCRIPTION
+    An easy platform independent way to send e-mail from any perl
+    script.
+
+    After struggling for some time with various command-line mailing
+    programs which didn't give me all the control I wanted, I found
+    a nice script by Christian Mallwitz, put it into a module, and
+    added a few features I wanted.
+
+    Mail::Sendmail contains mainly &sendmail, which takes a hash
+    with the message to send and sends it...
+
+    sendmail is exported to your namespace.
+
+INSTALLATION
+    - Copy Sendmail.pm to .../Perl/lib/Mail/ or
+    .../Perl/lib/site/Mail/
+
+    - At the top of Sendmail.pm, set your Time Zone and your default
+    SMTP server
+
+    - If you want to use MIME quoted-printable encoding, you need
+    MIME::QuotedPrint from CPAN. It's in the MIME-Base64 package. To
+    get it with your browser go to
+    http://www.perl.com/CPAN//modules/by-module/MIME/
+
+FEATURES
+    - Mime quoted printable encoding if requested (needs
+    MIME::QuotedPrint)
+
+    - Bcc: and Cc: support
+
+    - Doesn't send unwanted headers
+
+    - Allows you to send any header you want
+
+    - Doesn't abort sending if there is a bad recipient address
+    among other good ones
+
+    - Makes verbose error messages
+
+    - Adds the Date header if you don't supply your own
+
+LIMITATIONS
+    Doesn't send attachments (you can still send them if you provide
+    the appropriate headers and boundaries, but that may not be
+    practical).
+
+    Only tested on Win95 and NT with MS Exchange server and
+    CompuServe's server (whatever they use).
+
+    Not tested in a situation where the server goes down during
+    session
+
+USAGE DETAILS
+    sendmail
+        sendmail is the only thing exported to your namespace
+
+        `sendmail(%mail) || print "Error sending mail:
+        $Mail::Sendmail::error\n";'
+
+        - takes a hash containing the full message, with keys for
+        all headers, Body, and optionally for another non-default
+        SMTP server. (The Body part can be called "Body", "Message"
+        or "Text")
+
+        - returns 1 on success, 0 on error.
+
+        updates `$Mail::Sendmail::error' and `$Mail::Sendmail::log'.
+
+        Keys are not case-sensitive. They get normalized before use
+        with `ucfirst( lc $key )'
+
+    The following are not exported, but you can still access them
+    with their full name:
+
+    Mail::Sendmail::time_to_date()
+        convert time ( as from `time()' ) to a string suitable for
+        the Date header as per RFC 822.
+
+    $Mail::Sendmail::VERSION
+        The package version number
+
+    $Mail::Sendmail::error
+        Fatal or non-fatal socket or SMTP server errors
+
+    $Mail::Sendmail::log
+        You can check it out after a sendmail to see what it says
+
+    $Mail::Sendmail::address_rx
+        A handy regex to recognize e-mail addresses
+
+          Example:
+            $rx = $Mail::Sendmail::address_rx;
+            if (/$rx/) {
+              $address=$1;
+              $user=$2;
+              $domain=$3;
+            }
+
+    $Mail::Sendmail::default_smtp_server
+        see Configuration below
+
+    $Mail::Sendmail::default_smtp_port
+        see Configuration below
+
+    $Mail::Sendmail::TZ
+        Time Zone. see Configuration below
+
+CONFIGURATION
+    At the top of Sendmail.pm, there are 2 variables you have to
+    set:
+
+    - your Time Zone (until I change the module so it finds the TZ
+    itself)
+
+    - your default SMTP server.
+
+    and the port number if your server doesn't use the default port
+    25 (which would be surprising, but who knows).
+
+    If you want a different server only for a particular script put
+    `$Mail::Sendmail::default_smtp_server = 'newserver.my-
+    domain.com';' in your script.
+
+    If you want a different server only for a particular message,
+    add it to your %message hash with a key of 'Smtp':
+    `$message{Smtp} = 'newserver.my-domain.com';'
+
+ANOTHER EXAMPLE
+      use Mail::Sendmail;
+
+      print STDERR "Testing Mail::Sendmail version $Mail::Sendmail::VERSION\n";
+      print STDERR "smtp server: $Mail::Sendmail::default_smtp_server\n";
+      print STDERR "server port: $Mail::Sendmail::default_smtp_port\n";
+
+      %mail = (
+          #To      => 'No to field this time, only Bcc and Cc',
+          From    => 'Myself <me@here.com>',
+          Bcc     => 'Someone <him@there.com>, Someone else her@there.com',
+          # only addresses are extracted from Bcc, real names disregarded
+          Cc      => 'Yet someone else <xz@whatever.com>',
+          # Cc will appear in the header. (Bcc will not)
+          Subject => 'Test message',
+          'Content-transfer-encoding' => 'quoted-printable',
+          'X-Mailer' => "Mail::Sendmail",
+      );
+
+      $mail{Smtp} = 'special_server.for-this-message-only.domain.com';
+      $mail{'X-custom'} = 'My custom additionnal header';
+      $mail{message} = "Only a short message";
+      $mail{Date} = Mail::Sendmail::time_to_date( time() - 86400 ), # cheat on the date
+
+      if (sendmail %mail) { print "Mail sent OK.\n" }
+      else { print "Error sending mail: $Mail::Sendmail::error \n" }
+
+      print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
+
+AUTHOR
+    Milivoj Ivkovic mi@alma.ch or ivkovic@csi.com
+
+NOTES
+    You can use this freely.
+
+    I would appreciate a short (or long) e-mail note if you do. And
+    of course, bug-reports and/or improvements are welcome.
+
+    Last revision: 26.05.98. Latest version should be available at
+    http://alma.ch/perl/mail.htm
+
