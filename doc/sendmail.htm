@@ -1,6 +1,6 @@
     <HTML> 
 	<HEAD> 
-	    <TITLE>Mail::Sendmail v. 0.71 - Simple platform independent mailer
+	    <TITLE>Mail::Sendmail v. 0.72 - Simple platform independent mailer
 
 </TITLE> 
 	</HEAD>
@@ -32,7 +32,7 @@
 <H3><A NAME="NAME">NAME
 
 </A></H3>
-Mail::Sendmail v. 0.71 - Simple platform independent mailer
+Mail::Sendmail v. 0.72 - Simple platform independent mailer
 
 
 <P>
@@ -116,7 +116,7 @@ server
 - If you want to use MIME quoted-printable encoding, you need
 MIME::QuotedPrint from CPAN. It's in the MIME-Base64 package. To get it
 with your browser go to <A
-HREF="http://www.perl.com/CPAN//modules/by-module/MIME/">http://www.perl.com/CPAN//modules/by-module/MIME/</A>
+HREF="http://www.perl.com/CPAN/modules/by-module/MIME/">http://www.perl.com/CPAN/modules/by-module/MIME/</A>
 
 
 
@@ -127,7 +127,8 @@ HREF="http://www.perl.com/CPAN//modules/by-module/MIME/">http://www.perl.com/CPA
 <H3><A NAME="FEATURES">FEATURES
 
 </A></H3>
-- Mime quoted printable encoding if requested (needs MIME::QuotedPrint)
+- Automatic Mime quoted printable encoding if needed (needs
+MIME::QuotedPrint)
 
 
 <P>
@@ -168,13 +169,25 @@ good ones
 <H3><A NAME="LIMITATIONS">LIMITATIONS
 
 </A></H3>
-Doesn't send attachments (you can still send them if you provide the
-appropriate headers and boundaries, but that may not be practical).
+Doesn't send attachments. You can still send them if you provide the
+appropriate headers and boundaries, but that may not be practical, and I
+haven't tested it.
 
 
 <P>
 
 Not tested in a situation where the server goes down during session
+
+
+<P>
+
+Time Zone and SMTP server have to be set manually in Sendmail.pm or in your
+script, unless you can live with the defaults.
+
+
+<P>
+
+Time Zone has to be in numeric form (not like ``GMT'' etc...)
 
 
 <P>
@@ -260,7 +273,7 @@ Fatal or non-fatal socket or SMTP server errors
 <DT><STRONG><A NAME="item__Mail_Sendmail_log">$Mail::Sendmail::log
 
 </A></STRONG><DD>
-You can check it out after a sendmail to see what it says
+A summary that you could write to a log file after each send
 
 
 <P>
@@ -314,7 +327,7 @@ Time Zone. see Configuration below
 <H3><A NAME="CONFIGURATION">CONFIGURATION
 
 </A></H3>
-At the top of Sendmail.pm, there are 2 variables you have to set:
+At the top of Sendmail.pm, there are 2 variables you should set:
 
 
 <P>
@@ -377,7 +390,6 @@ your <CODE>%message</CODE> hash with a key of 'Smtp':
       Cc      =&gt; 'Yet someone else &lt;xz@whatever.com&gt;',
       # Cc will appear in the header. (Bcc will not)
       Subject =&gt; 'Test message',
-      'Content-transfer-encoding' =&gt; 'quoted-printable',
       'X-Mailer' =&gt; &quot;Mail::Sendmail&quot;,
   );
 </PRE>
@@ -408,6 +420,12 @@ your <CODE>%message</CODE> hash with a key of 'Smtp':
 <H3><A NAME="CHANGES">CHANGES
 
 </A></H3>
+0.72: Fixed line endings in Body to ``\r\n''. MIME quoted printable
+encoding is now automatic if needed. Test script can now run unattended.
+
+
+<P>
+
 0.71: Fixed Time Zone bug with AS port. Added half-hour Time Zone support.
 Repackaged with \n line endings instead of \r\n.
 
@@ -448,7 +466,7 @@ This version has been tested on Win95 and WinNT 4.0 with Perl 5.003_07 (AS
 
 <P>
 
-Last revision: 07.07.98. Latest version should be available at <A
+Last revision: 08.07.98. Latest version should be available at <A
 HREF="http://alma.ch/perl/mail.htm">http://alma.ch/perl/mail.htm</A>
 
 

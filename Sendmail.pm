@@ -2,7 +2,7 @@ package Mail::Sendmail;
 # Mail::Sendmail by Milivoj Ivkovic <mi@alma.ch> or <ivkovic@csi.com>
 # see embedded POD documentation below or http://alma.ch/perl/mail.htm
 
-$VERSION  = "0.71";
+$VERSION  = "0.72";
 
 # *************** CUSTOMIZE the following lines *********************
 
@@ -23,7 +23,7 @@ $default_smtp_port = 25;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.71 - Simple platform independent mailer
+Mail::Sendmail v. 0.72 - Simple platform independent mailer
 
 
 =head1 SYNOPSIS
@@ -64,11 +64,11 @@ sendmail is exported to your namespace.
 - If you want to use MIME quoted-printable encoding, you need
 MIME::QuotedPrint from CPAN. It's in the MIME-Base64 package.
 To get it with your browser go to
-http://www.perl.com/CPAN//modules/by-module/MIME/
+http://www.perl.com/CPAN/modules/by-module/MIME/
 
 =head1 FEATURES
 
-- Mime quoted printable encoding if requested (needs MIME::QuotedPrint)
+- Automatic Mime quoted printable encoding if needed (needs MIME::QuotedPrint)
 
 - Bcc: and Cc: support
 
@@ -84,10 +84,16 @@ http://www.perl.com/CPAN//modules/by-module/MIME/
 
 =head1 LIMITATIONS
 
-Doesn't send attachments (you can still send them if you provide
-the appropriate headers and boundaries, but that may not be practical).
+Doesn't send attachments. You can still send them if you provide
+the appropriate headers and boundaries, but that may not be practical,
+and I haven't tested it.
 
 Not tested in a situation where the server goes down during session
+
+Time Zone and SMTP server have to be set manually in Sendmail.pm or in your script,
+unless you can live with the defaults.
+
+Time Zone has to be in numeric form (not like "GMT" etc...)
 
 =head1 USAGE DETAILS
 
@@ -130,7 +136,7 @@ Fatal or non-fatal socket or SMTP server errors
 
 =item $Mail::Sendmail::log
 
-You can check it out after a sendmail to see what it says
+A summary that you could write to a log file after each send
 
 =item $Mail::Sendmail::address_rx
 
@@ -160,7 +166,7 @@ Time Zone. see Configuration below
 
 =head1 CONFIGURATION
 
-At the top of Sendmail.pm, there are 2 variables you have to set:
+At the top of Sendmail.pm, there are 2 variables you should set:
 
 - your Time Zone (until I change the module so it finds the TZ itself).
   (1 hour for daylight savings time is added if your system says it should be)
@@ -194,7 +200,6 @@ your %message hash with a key of 'Smtp':
       Cc      => 'Yet someone else <xz@whatever.com>',
       # Cc will appear in the header. (Bcc will not)
       Subject => 'Test message',
-      'Content-transfer-encoding' => 'quoted-printable',
       'X-Mailer' => "Mail::Sendmail",
   );
 
@@ -209,6 +214,10 @@ your %message hash with a key of 'Smtp':
   print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
 =head1 CHANGES
+
+0.72: Fixed line endings in Body to "\r\n".
+      MIME quoted printable encoding is now automatic if needed.
+      Test script can now run unattended.
 
 0.71: Fixed Time Zone bug with AS port.
       Added half-hour Time Zone support.
@@ -230,7 +239,7 @@ This version has been tested on Win95 and WinNT 4.0 with
 Perl 5.003_07 (AS 313) and Perl 5.004_02 (GS),
 and on Linux 2.0.34 (Red Hat 5.1) with 5.004_04.
 
-Last revision: 07.07.98. Latest version should be available at
+Last revision: 08.07.98. Latest version should be available at
 http://alma.ch/perl/mail.htm
 
 =cut
@@ -241,7 +250,6 @@ BEGIN {
 
 	eval "use MIME::QuotedPrint";
 	if ($@) {
-		warn "MIME::QuotedPrint not present. You won't be able to encode accented characters!\n";
 		$MIME_OK = 0;
 	}
 	else {$MIME_OK = 1};
@@ -285,7 +293,9 @@ sub sendmail {
 	# redo hash, arranging keys case
     my %mail; my $k;
     while ($k = shift @_) {
-		$mail{ucfirst lc $k} = shift @_;
+        $k = ucfirst lc $k;
+        $k =~ s/\s*:\s*$//o; # kill colon (and possible spaces) at end, we add it later.
+		$mail{$k} = shift @_;
 	}
 
     my $smtp = $mail{Smtp} || $default_smtp_server;
@@ -304,27 +314,32 @@ sub sendmail {
 
     $mail{'X-mailer'} .= " $VERSION" if defined $mail{'X-mailer'};
 
-	# Default MIME headers if needed
-	unless ($mail{'Mime-version'}) {
-		 $mail{'Mime-version'} = '1.0';
-	};
-	unless ($mail{'Content-type'}) {
-		 $mail{'Content-type'} = 'text/plain; charset="iso-8859-1"';
-	};
-	unless ($mail{'Content-transfer-encoding'}) {
-		 $mail{'Content-transfer-encoding'} = '8bit';
-	};
-
 	# add Date header if needed
-	unless ($mail{Date}) {
-		 $mail{Date} = time_to_date;
-	};
+    $mail{Date} = time_to_date unless ($mail{Date});
 
     # cleanup message, and encode if needed
     $message =~ s/^\./\.\./gm; 	# handle . as first character
-    #$message =~ s/\r\n/\n/g; 	# handle line ending
-    #$message =~ s/\n/\r\n/g;
-    $message = encode_qp($message) if ($MIME_OK and $mail{'Content-transfer-encoding'} =~ /^quoted/io);
+    $message =~ s/\r\n/\n/g; 	# handle line ending
+    $message =~ s/\n/\r\n/g;
+
+    if ($message =~ /[\200-\377]/) {
+    # accented characters need encoding
+   	# add default MIME headers unless already specified
+
+        $mail{'Mime-version'} = '1.0' unless ($mail{'Mime-version'});
+        $mail{'Content-type'} = 'text/plain; charset="iso-8859-1"' unless ($mail{'Content-type'});
+        if ($MIME_OK) {
+            my @lines = split /\r\n/, $message;     # this looks clumsy...
+            @lines = map {encode_qp($_)} @lines;    # must find a better way
+            $message = join("\r\n", @lines);
+            $mail{'Content-transfer-encoding'} = 'quoted-printable';
+        }
+        else {
+            warn "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
+            $error .= "MIME::QuotedPrint not present!\nSending 8bit characters, hoping it will come across OK.\n";
+            $mail{'Content-transfer-encoding'} = '8bit' unless ($mail{'Content-transfer-encoding'});
+        }
+    }
     
 	# cleanup smtp
     $smtp =~ s/^\s+//g; # remove spaces around $mail{Smtp}
@@ -376,12 +391,17 @@ sub sendmail {
     	$error .= "socket failed ($!)";
     	return 0
     }
+
     if (!connect(S, pack('Sna4x8', AF_INET, $port, $smtpaddr))) {
-    	$error .= "connect failed ($!)";
+#    my $packed = pack('Sna4x8', AF_INET, $port, $smtpaddr);
+#    if (!connect(S, pack('Sna4x8', AF_INET, $port, $smtpaddr))) {
+#     	$error .= "connect failed to '$packed' ($!)";
+#    why does connect sometimes fail ?? Should I retry a few times?
+     	$error .= "connect failed ($!)";
     	return 0;
     }
     
-    my($oldfh) = select(S); $| = 1; select($oldfh);
+    my($oldfh) = select(S); $| = 1; select($oldfh); # what is this $oldfh for? 
     
     $_ = <S>;
     if (/^[45]/) {
@@ -393,16 +413,16 @@ sub sendmail {
     print S "helo localhost\r\n";
     $_ = <S>;
     if (/^[45]/) {
-    	close S;
     	$error .= "mysterious communication error: $_";
+    	close S;
 		return 0;
 	}
     
     print S "mail from: <$fromaddr>\r\n";
     $_ = <S>;
     if (/^[45]/) {
-    	close S;
     	$error .= "mysterious communication error: $_";
+    	close S;
     	return 0;
     }
     
@@ -423,13 +443,11 @@ sub sendmail {
     print S "data\r\n";
     $_ = <S>;
     if (/^[45]/) {
-    	close S;
     	$error .= "mysterious communication error: $_";
+    	close S;
     	return 0;
     }
     
-    #Is the order of headers important? Probably not! 
-
     # print headers
     foreach $header (keys %mail) {
     	print S "$header: ", $mail{$header}, "\r\n";
@@ -455,12 +473,15 @@ sub sendmail {
     return 1;
 } # end sub sendmail
 
-	END { }       # module clean-up code here (global destructor)
-	$VERSION;	# repeat to avoid "used only once" warning, and also for "modules must return true"
+1;
 	
 __END__
 changes:
 
+0.72:   Fixed line endings in Body to "\r\n".
+        MIME quoted printable encoding is now automatic if needed.
+        Test script can now run unattended.
+0.71:   corrected Time Zone for AS port.
 0.70:	corrected bug when hash key passed with empty or undefined (=false) value
 0.69:   use MIME::Quotedprint in eval, so it works without it.
 0.64:	Message body can be in $mail{Message} or $mail{Body} or $mail{Text}

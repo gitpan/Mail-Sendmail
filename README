@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.71 - Simple platform independent mailer
+    Mail::Sendmail v. 0.72 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -39,10 +39,10 @@ INSTALLATION
     - If you want to use MIME quoted-printable encoding, you need
     MIME::QuotedPrint from CPAN. It's in the MIME-Base64 package. To
     get it with your browser go to
-    http://www.perl.com/CPAN//modules/by-module/MIME/
+    http://www.perl.com/CPAN/modules/by-module/MIME/
 
 FEATURES
-    - Mime quoted printable encoding if requested (needs
+    - Automatic Mime quoted printable encoding if needed (needs
     MIME::QuotedPrint)
 
     - Bcc: and Cc: support
@@ -59,12 +59,17 @@ FEATURES
     - Adds the Date header if you don't supply your own
 
 LIMITATIONS
-    Doesn't send attachments (you can still send them if you provide
+    Doesn't send attachments. You can still send them if you provide
     the appropriate headers and boundaries, but that may not be
-    practical).
+    practical, and I haven't tested it.
 
     Not tested in a situation where the server goes down during
     session
+
+    Time Zone and SMTP server have to be set manually in Sendmail.pm
+    or in your script, unless you can live with the defaults.
+
+    Time Zone has to be in numeric form (not like "GMT" etc...)
 
 USAGE DETAILS
     sendmail
@@ -99,7 +104,7 @@ USAGE DETAILS
         Fatal or non-fatal socket or SMTP server errors
 
     $Mail::Sendmail::log
-        You can check it out after a sendmail to see what it says
+        A summary that you could write to a log file after each send
 
     $Mail::Sendmail::address_rx
         A handy regex to recognize e-mail addresses
@@ -122,8 +127,7 @@ USAGE DETAILS
         Time Zone. see Configuration below
 
 CONFIGURATION
-    At the top of Sendmail.pm, there are 2 variables you have to
-    set:
+    At the top of Sendmail.pm, there are 2 variables you should set:
 
     - your Time Zone (until I change the module so it finds the TZ
     itself). (1 hour for daylight savings time is added if your
@@ -157,7 +161,6 @@ ANOTHER EXAMPLE
           Cc      => 'Yet someone else <xz@whatever.com>',
           # Cc will appear in the header. (Bcc will not)
           Subject => 'Test message',
-          'Content-transfer-encoding' => 'quoted-printable',
           'X-Mailer' => "Mail::Sendmail",
       );
 
@@ -172,6 +175,10 @@ ANOTHER EXAMPLE
       print STDERR "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
 
 CHANGES
+    0.72: Fixed line endings in Body to "\r\n". MIME quoted
+    printable encoding is now automatic if needed. Test script can
+    now run unattended.
+
     0.71: Fixed Time Zone bug with AS port. Added half-hour Time
     Zone support. Repackaged with \n line endings instead of \r\n.
 
@@ -188,6 +195,6 @@ NOTES
     5.003_07 (AS 313) and Perl 5.004_02 (GS), and on Linux 2.0.34
     (Red Hat 5.1) with 5.004_04.
 
-    Last revision: 07.07.98. Latest version should be available at
+    Last revision: 08.07.98. Latest version should be available at
     http://alma.ch/perl/mail.htm
 
