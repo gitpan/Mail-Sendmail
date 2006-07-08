@@ -5,6 +5,16 @@ suggestions or reporting bugs. I can't any more keep track of all
 the people who send me usefull comments, but I do read them and
 thank everybody!
 
+0.79_16
+       - experimental SMTP AUTH support (LOGIN PLAIN CRAM-MD5 DIGEST-MD5)
+       - Fix bug where one refused RCPT TO: would abort everything 
+       - send EHLO, and parse response (for later AUTH implementation)
+       - better handling of multi-line responses, and better error-messages
+       - Also normalize line endings in headers
+       - Now keeps the Sender header if it was used. Previous versions
+         only used it for the MAIL FROM: command and deleted it.
+       - No space between "MAIL FROM:" or "RCPT TO:" and address.
+
 0.79   same as 0.78_6
 
 0.78_6 06.02.2003

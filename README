@@ -1,5 +1,5 @@
 NAME
-    Mail::Sendmail v. 0.79 - Simple platform independent mailer
+    Mail::Sendmail v. 0.79_16 - Simple platform independent mailer
 
 SYNOPSIS
       use Mail::Sendmail;
@@ -17,13 +17,15 @@ DESCRIPTION
     Simple platform independent e-mail from your perl script. Only requires
     Perl 5 and a network connection.
 
-    Mail::Sendmail contains mainly &sendmail, which takes a hash with the
-    message to send and sends it. It is intended to be very easy to setup
-    and use. See also the section on "FEATURES" below.
+    Mail::Sendmail takes a hash with the message to send and sends it to
+    your mail server. It is intended to be very easy to setup and use. See
+    also "FEATURES" below, and as usual, read this documentation.
+
+    There is also a FAQ (see "NOTES").
 
 INSTALLATION
     Best
-        `perl -MCPAN -e "install Mail::Sendmail"'
+        "perl -MCPAN -e "install Mail::Sendmail""
 
     Traditional
             perl Makefile.PL
@@ -40,7 +42,13 @@ INSTALLATION
              They are listed when you type C< perl -V >)
 
     ActivePerl's PPM
-        ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
+        Depending on your PPM version:
+
+                ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
+
+        or
+
+                ppm install http://alma.ch/perl/ppm/Mail-Sendmail.ppd
 
         But this way you don't get a chance to have a look at other files
         (Changes, Todo, test.pl, ...).
@@ -68,10 +76,10 @@ FEATURES
 
     Good plain text error reporting
 
+    Experimental support for SMTP AUTHentication
+
 LIMITATIONS
     Headers are not encoded, even if they have accented characters.
-
-    No suport for the SMTP AUTH extension.
 
     Since the whole message is in memory, it's not suitable for sending very
     big attached files.
@@ -88,33 +96,32 @@ CONFIGURATION
         Sendmail.pm file. This is a reference to a list of SMTP servers. You
         can also set it from your script:
 
-        `unshift @{$Mail::Sendmail::mailcfg{'smtp'}} , 'my.mail.server';'
+        "unshift @{$Mail::Sendmail::mailcfg{'smtp'}} , 'my.mail.server';"
 
         Alternatively, you can specify the server in the *%mail* hash you
         send from your script, which will do the same thing:
 
-        `$mail{smtp} = 'my.mail.server';'
+        "$mail{smtp} = 'my.mail.server';"
 
         A future version will (hopefully) try to set useful defaults for you
         during the Makefile.PL.
 
     Other configuration settings
-        See *%mailcfg* under the section on "DETAILS" below for other
-        configuration options.
+        See *%mailcfg* under "DETAILS" below for other configuration
+        options.
 
 DETAILS
   sendmail()
-
     sendmail is the only thing exported to your namespace by default
 
-    `sendmail(%mail) || print "Error sending mail:
-    $Mail::Sendmail::error\n";'
+    "sendmail(%mail) || print "Error sending mail:
+    $Mail::Sendmail::error\n";"
 
-    It takes a hash containing the full message, with keys for all headers,
-    body, and optionally for another non-default SMTP server and/or port.
+    It takes a hash containing the full message, with keys for all headers
+    and the body, as well as for some specific options.
 
     It returns 1 on success or 0 on error, and rewrites
-    `$Mail::Sendmail::error' and `$Mail::Sendmail::log'.
+    $Mail::Sendmail::error and $Mail::Sendmail::log.
 
     Keys are NOT case-sensitive.
 
@@ -123,8 +130,7 @@ DETAILS
     The Body part key can be called 'Body', 'Message' or 'Text'.
 
     The SMTP server key can be called 'Smtp' or 'Server'. If the connection
-    to this one fails, the other ones in `$mailcfg{smtp}' will still be
-    tried.
+    to this one fails, the other ones in $mailcfg{smtp} will still be tried.
 
     The following headers are added unless you specify them yourself:
 
@@ -138,29 +144,64 @@ DETAILS
         Date: [string returned by time_to_date()]
 
     If you wish to use an envelope sender address different than the From:
-    address, set `$mail{Sender}' in your %mail hash.
+    address, set $mail{Sender} in your %mail hash.
 
     The following are not exported by default, but you can still access them
     with their full name, or request their export on the use line like in:
-    `use Mail::Sendmail qw(sendmail $address_rx time_to_date);'
+    "use Mail::Sendmail qw(sendmail $address_rx time_to_date);"
+
+   embedding options in your %mail hash
+    The following options can be set in your %mail hash. The corresponding
+    keys will be removed before sending the mail.
+
+    $mail{smtp} or $mail{server}
+        The SMTP server to try first. It will be added
+
+    $mail{port}
+        This option will be removed. To use a non-standard port, set it in
+        your server name:
+
+        $mail{server}='my.smtp.server:2525' will try to connect to port 2525
+        on server my.smtp.server
+
+    $mail{auth}
+        This must be a reference to a hash containg all your authentication
+        options:
+
+        $mail{auth} = \%options; or $mail{auth} = {user=>"username",
+        password=>"password", method=>"DIGEST-MD5", required=>0 };
+
+        user
+            username
+
+        pass or password
+            password
+
+        method
+            optional method. compared (stripped down) to available methods.
+            If empty, will try all available.
+
+        required
+            optional. defaults to false. If set to true, no delivery will be
+            attempted if authentication fails. If false or undefined, and
+            authentication fails or is not available, sending is tried
+            without.
+
+            (different auth for different servers?)
 
   Mail::Sendmail::time_to_date()
-
-    convert time ( as from `time()' ) to an RFC 822 compliant string for the
-    Date header. See also the section on "%Mail::Sendmail::mailcfg".
+    convert time ( as from "time()" ) to an RFC 822 compliant string for the
+    Date header. See also "%Mail::Sendmail::mailcfg".
 
   $Mail::Sendmail::error
-
     When you don't run with the -w flag, the module sends no errors to
     STDERR, but puts anything it has to complain about in here. You should
     probably always check if it says something.
 
   $Mail::Sendmail::log
-
     A summary that you could write to a log file after each send
 
   $Mail::Sendmail::address_rx
-
     A handy regex to recognize e-mail addresses.
 
     A correct regex for valid e-mail addresses was written by one of the
@@ -178,19 +219,19 @@ DETAILS
         }
 
   %Mail::Sendmail::mailcfg
-
-    This hash contains all configuration options. You normally edit it once
-    (if ever) in Sendmail.pm and forget about it, but you could also access
-    it from your scripts. For readability, I'll assume you have imported it
-    (with something like `use Mail::Sendmail qw(sendmail %mailcfg)').
+    This hash contains installation-wide configuration options. You normally
+    edit it once (if ever) in Sendmail.pm and forget about it, but you could
+    also access it from your scripts. For readability, I'll assume you have
+    imported it (with something like "use Mail::Sendmail qw(sendmail
+    %mailcfg)").
 
     The keys are not case-sensitive: they are all converted to lowercase
-    before use. Writing `$mailcfg{Port} = 2525;' is OK: the default
+    before use. Writing "$mailcfg{Port} = 2525;" is OK: the default
     $mailcfg{port} (25) will be deleted and replaced with your new value of
     2525.
 
     $mailcfg{smtp}
-        `$mailcfg{smtp} = [qw(localhost my.other.mail.server)];'
+        "$mailcfg{smtp} = [qw(localhost my.other.mail.server)];"
 
         This is a reference to a list of smtp servers, so if your main
         server is down, the module tries the next one. If one of your
@@ -201,7 +242,7 @@ DETAILS
         Default: localhost.
 
     $mailcfg{from}
-        `$mailcfg{from} = 'Mailing script me@mydomain.com';'
+        "$mailcfg{from} = 'Mailing script me@mydomain.com';"
 
         From address used if you don't supply one in your script. Should not
         be of type 'user@localhost' since that may not be valid on the
@@ -210,7 +251,7 @@ DETAILS
         Default: undefined.
 
     $mailcfg{mime}
-        `$mailcfg{mime} = 1;'
+        "$mailcfg{mime} = 1;"
 
         Set this to 0 if you don't want any automatic MIME encoding. You
         normally don't need this, the module should 'Do the right thing'
@@ -219,7 +260,7 @@ DETAILS
         Default: 1;
 
     $mailcfg{retries}
-        `$mailcfg{retries} = 1;'
+        "$mailcfg{retries} = 1;"
 
         How many times should the connection to the same SMTP server be
         retried in case of a failure.
@@ -227,7 +268,7 @@ DETAILS
         Default: 1;
 
     $mailcfg{delay}
-        `$mailcfg{delay} = 1;'
+        "$mailcfg{delay} = 1;"
 
         Number of seconds to wait between retries. This delay also happens
         before trying the next server in the list, if the retries for the
@@ -240,10 +281,10 @@ DETAILS
         Default: 1 (second);
 
     $mailcfg{tz}
-        `$mailcfg{tz} = '+0800';'
+        "$mailcfg{tz} = '+0800';"
 
         Normally, your time zone is set automatically, from the difference
-        between `time()' and `gmtime()'. This allows you to override
+        between "time()" and "gmtime()". This allows you to override
         automatic detection in cases where your system is confused (such as
         some Win32 systems in zones which do not use daylight savings time:
         see Microsoft KB article Q148681)
@@ -251,14 +292,14 @@ DETAILS
         Default: undefined (automatic detection at run-time).
 
     $mailcfg{port}
-        `$mailcfg{port} = 25;'
+        "$mailcfg{port} = 25;"
 
         Port used when none is specified in the server name.
 
         Default: 25.
 
     $mailcfg{debug}
-        `$mailcfg{debug} = 0;'
+        "$mailcfg{debug} = 0;"
 
         Prints stuff to STDERR. Current maximum is 6, which prints the whole
         SMTP session, except data exceeding 500 bytes.
@@ -266,11 +307,9 @@ DETAILS
         Default: 0;
 
   $Mail::Sendmail::VERSION
-
     The package version number (you can not import this one)
 
   Configuration variables from previous versions
-
     The following global variables were used in version 0.74 for
     configuration. As from version 0.78_1, they are not supported anymore.
     Use the *%mailcfg* hash if you need to access the configuration from
@@ -283,6 +322,7 @@ DETAILS
     $Mail::Sendmail::connect_retries
     $Mail::Sendmail::retry_delay
     $Mail::Sendmail::use_MIME
+
 ANOTHER EXAMPLE
       use Mail::Sendmail;
 
@@ -311,42 +351,25 @@ ANOTHER EXAMPLE
       else { print "Error sending mail: $Mail::Sendmail::error \n" }
 
       print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
- 
+
     Also see http://alma.ch/perl/Mail-Sendmail-FAQ.html for examples of HTML
     mail and sending attachments.
 
 CHANGES
-    Main changes since version 0.78:
+    Main changes since version 0.79:
 
-    Added "/" (\x2F) as a valid character in mailbox part.
+    Experimental SMTP AUTH support (LOGIN PLAIN CRAM-MD5 DIGEST-MD5)
 
-    Removed old configuration variables which are not used anymore since
-    version 0.74.
+    Fix bug where one refused RCPT TO: would abort everything
 
-    Added support for different envelope sender (through `$mail{Sender}')
+    send EHLO, and parse response
 
-    Changed case of headers: first character after "-" also uppercased
+    Better handling of multi-line responses, and better error-messages
 
-    Support for multi-line server responses
+    Non-conforming line-endings also normalized in headers
 
-    Localized $\ and $_
-
-    Some internal rewrites and documentation updates
-
-    Fixed old bug of dot as 76th character on line disappearing.
-
-    Fixed very old bug where port number was not extracted from stuff like
-    'my.server:2525'.
-
-    Fixed time_to_date bug with negative half-hour zones (only
-    Newfoundland?)
-
-    Added seconds to date string
-
-    Now uses Sys::Hostname to get the hostname for HELO. (This may break the
-    module on some very old Win32 Perls where Sys::Hostname was broken)
-
-    Enable full session output for debugging
+    Now keeps the Sender header if it was used. Previous versions only used
+    it for the MAIL FROM: command and deleted it.
 
     See the Changes file for the full history. If you don't have it because
     you installed through PPM, you can also find the latest one on

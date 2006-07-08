@@ -5,11 +5,11 @@ package Mail::Sendmail;
 
 =head1 NAME
 
-Mail::Sendmail v. 0.79 - Simple platform independent mailer
+Mail::Sendmail v. 0.79_16 - Simple platform independent mailer
 
 =cut
 
-$VERSION = '0.79';
+$VERSION = substr q$Revision: 0.79_16 $, 10;
 
 # *************** Configuration you may want to change *******************
 # You probably want to set your SMTP server here (unless you specify it in
@@ -48,11 +48,16 @@ use vars qw(
             $error
             $retry_delay
             $connect_retries
+            $auth_support
            );
 
 use Socket;
 use Time::Local; # for automatic time zone detection
 use Sys::Hostname; # for use of hostname in HELO
+
+#use Digest::HMAC_MD5 qw(hmac_md5 hmac_md5_hex);
+
+$auth_support = 'DIGEST-MD5 CRAM-MD5 PLAIN LOGIN';
 
 # use MIME::QuotedPrint if available and configured in %mailcfg
 eval("use MIME::QuotedPrint");
@@ -81,6 +86,55 @@ my $ip_rx = '\[\d{1,3}(?:\.\d{1,3}){3}\]';
 
 $address_rx = '((' . $user_rx . ')\@(' . $dom_rx . '|' . $ip_rx . '))';
 ; # v. 0.61
+
+sub _require_md5 {
+    eval { require Digest::MD5; Digest::MD5->import(qw(md5 md5_hex)); };
+    $error .= $@ if $@;
+    return ($@ ? undef : 1);
+}
+
+sub _require_base64 {
+    eval {
+        require MIME::Base64; MIME::Base64->import(qw(encode_base64 decode_base64));
+    };
+    $error .= $@ if $@;
+    return ($@ ? undef : 1);
+}
+
+sub _hmac_md5 {
+    my ($pass, $ckey) = @_;
+    my $size = 64;
+    $pass = md5($pass) if length($pass) > $size;
+    my $ipad = $pass ^ (chr(0x36) x $size);
+    my $opad = $pass ^ (chr(0x5c) x $size);
+    return md5_hex($opad, md5($ipad, $ckey));
+}
+
+sub _digest_md5 {
+    my ($user, $pass, $challenge, $realm) = @_;
+
+    my %ckey = map { /^([^=]+)="?(.+?)"?$/ } split(/,/, $challenge);
+    $realm ||= $ckey{realm}; #($user =~ s/\@(.+)$//o) ? $1 : $server;
+    my $nonce  = $ckey{nonce};
+    my $cnonce = &make_cnonce;
+    my $uri = join('/', 'smtp', hostname()||'localhost', $ckey{realm});
+    my $qop = 'auth';
+    my $nc  = '00000001';
+    my($hv, $a1, $a2);
+    $hv = md5("$user:$realm:$pass");
+    $a1 = md5_hex("$hv:$nonce:$cnonce");
+    $a2 = md5_hex("AUTHENTICATE:$uri");
+    $hv = md5_hex("$a1:$nonce:$nc:$cnonce:$qop:$a2");
+    return qq(username="$user",realm="$ckey{realm}",nonce="$nonce",nc=$nc,cnonce="$cnonce",digest-uri="$uri",response=$hv,qop=$qop);
+}
+
+sub make_cnonce {
+    my $s = '' ;
+    for(1..16) { $s .= chr(rand 256) }
+    $s = encode_base64($s, "");
+    $s =~ s/\W/X/go;
+    return substr($s, 0, 16);
+}
 
 sub time_to_date {
     # convert a time() value to a date-time string according to RFC 822
@@ -123,13 +177,17 @@ sub sendmail {
     my (%mail, $k,
         $smtp, $server, $port, $connected, $localhost,
         $fromaddr, $recip, @recipients, $to, $header,
+        %esmtp, @wanted_methods,
        );
-
+    use vars qw($server_reply);
     # -------- a few internal subs ----------
     sub fail {
         # things to do before returning a sendmail failure
-        print STDERR @_ if $^W;
         $error .= join(" ", @_) . "\n";
+        if ($server_reply) {
+            $error .= "Server said: $server_reply\n";
+            print STDERR "Server said: $server_reply\n" if $^W;
+        }
         close S;
         return 0;
     }
@@ -153,16 +211,19 @@ sub sendmail {
     }
 
     sub socket_read {
-        my $response; # for multi-line server responses
+        $server_reply = "";
         do {
-            chomp($_ = <S>);
-            print "<$_\n" if $mailcfg{'debug'} > 5;
+            $_ = <S>;
+            $server_reply .= $_;
+            #chomp $_;
+            print "<$_" if $mailcfg{'debug'} > 5;
             if (/^[45]/ or !$_) {
+                chomp $server_reply;
                 return; # return false
             }
-            $response .= $_;
-         } while (/^[\d]+-/);
-         return $response;
+        } while (/^[\d]+-/);
+        chomp $server_reply;
+        return $server_reply;
     }
     # -------- end of internal subs ----------
 
@@ -188,6 +249,11 @@ sub sendmail {
         # than in Outlook.
         $k =~ s/-(.)/"-" . uc($1)/ge;
         $mail{$k} = shift @_;
+        if ($k !~ /^(Message|Body|Text)$/i) {
+            # normalize possible line endings in headers
+            $mail{$k} =~ s/\015\012?/\012/go;
+            $mail{$k} =~ s/\012/$CRLF/go;
+        }
     }
 
     $smtp = $mail{'Smtp'} || $mail{'Server'};
@@ -202,6 +268,10 @@ sub sendmail {
     $mailcfg{'port'} = $mail{'Port'} || $mailcfg{'port'} || 25;
     delete $mail{'Port'};
 
+    my $auth = $mail{'Auth'};
+    delete $mail{'Auth'};
+
+
     {    # don't warn for undefined values below
         local $^W = 0;
         $mail{'Message'} = join("", $mail{'Message'}, $mail{'Body'}, $mail{'Text'});
@@ -213,7 +283,7 @@ sub sendmail {
     # Extract 'From:' e-mail address to use as envelope sender
 
     $fromaddr = $mail{'Sender'} || $mail{'From'} || $mailcfg{'from'};
-    delete $mail{'Sender'};
+    #delete $mail{'Sender'};
     unless ($fromaddr =~ /$address_rx/) {
         return fail("Bad or missing From address: \'$fromaddr\'");
     }
@@ -321,28 +391,141 @@ sub sendmail {
         $log .= "Server: $smtp Port: $port\n"
               . "From: $fromaddr\n"
               . "Subject: $mail{Subject}\n"
-              . "To: ";
+              ;
     }
 
     my($oldfh) = select(S); $| = 1; select($oldfh);
 
     socket_read()
         || return fail("Connection error from $smtp on port $port ($_)");
-    socket_write("HELO $localhost$CRLF")
-        || return fail("send HELO error");
-    socket_read()
-        || return fail("HELO error ($_)");
-    socket_write("MAIL FROM: <$fromaddr>$CRLF")
+    socket_write("EHLO $localhost$CRLF")
+        || return fail("send EHLO error (lost connection?)");
+    my $ehlo = socket_read();
+    if ($ehlo) {
+        # parse EHLO response
+        map {
+            s/^\d+[- ]//;
+            my ($k, $v) = split /\s+/, $_, 2;
+            $esmtp{$k} = $v || 1 if $k;
+        } split(/\n/, $ehlo);
+    }
+    else {
+        # try plain HELO instead
+        socket_write("HELO $localhost$CRLF")
+            || return fail("send HELO error (lost connection?)");
+    }
+
+    if ($auth) {
+        warn "AUTH requested\n" if ($mailcfg{debug} > 4);
+        # reduce wanted methods to those supported
+        my @methods = grep {$esmtp{'AUTH'}=~/(^|\s)$_(\s|$)/i}
+                        grep {$auth_support =~ /(^|\s)$_(\s|$)/i}
+                            grep /\S/, split(/\s+/, $auth->{method});
+
+        if (@methods) {
+            # try to authenticate
+
+            if (exists $auth->{pass}) {
+                $auth->{password} = $auth->{pass};
+            }
+
+            my $method = uc $methods[0];
+            _require_base64() || fail("Could not use MIME::Base64 module required for authentication");
+            if ($method eq "LOGIN") {
+                print STDERR "Trying AUTH LOGIN\n" if ($mailcfg{debug} > 9);
+                socket_write("AUTH LOGIN$CRLF")
+                    || return fail("send AUTH LOGIN failed (lost connection?)");
+                socket_read()
+                    || return fail("AUTH LOGIN failed: $server_reply");
+                socket_write(encode_base64($auth->{user},$CRLF))
+                    || return fail("send LOGIN username failed (lost connection?)");
+                socket_read()
+                    || return fail("LOGIN username failed: $server_reply");
+                socket_write(encode_base64($auth->{password},$CRLF))
+                    || return fail("send LOGIN password failed (lost connection?)");
+                socket_read()
+                    || return fail("LOGIN password failed: $server_reply");
+            }
+            elsif ($method eq "PLAIN") {
+                warn "Trying AUTH PLAIN\n" if ($mailcfg{debug} > 9);
+                socket_write(
+                    "AUTH PLAIN "
+                    . encode_base64(join("\0", $auth->{user}, $auth->{user}, $auth->{password}), $CRLF)
+                ) || return fail("send AUTH PLAIN failed (lost connection?)");
+                socket_read()
+                    || return fail("AUTH PLAIN failed: $server_reply");
+            }
+            elsif ($method eq "CRAM-MD5") {
+                _require_md5() || fail("Could not use Digest::MD5 module required for authentication");
+                warn "Trying AUTH CRAM-MD5\n" if ($mailcfg{debug} > 9);
+                socket_write("AUTH CRAM-MD5$CRLF")
+                    || return fail("send CRAM-MD5 failed (lost connection?)");
+                my $challenge = socket_read()
+                    || return fail("AUTH CRAM-MD5 failed: $server_reply");
+                $challenge =~ s/^\d+\s+//;
+                my $response = _hmac_md5($auth->{password}, decode_base64($challenge));
+                socket_write(encode_base64("$auth->{user} $response", $CRLF))
+                    || return fail("AUTH CRAM-MD5 failed: $server_reply");
+                socket_read()
+                    || return fail("AUTH CRAM-MD5 failed: $server_reply");
+            }
+            elsif ($method eq "DIGEST-MD5") {
+                _require_md5() || fail("Could not use Digest::MD5 module required for authentication");
+                warn "Trying AUTH DIGEST-MD5\n" if ($mailcfg{debug} > 9);
+                socket_write("AUTH DIGEST-MD5$CRLF")
+                    || return fail("send CRAM-MD5 failed (lost connection?)");
+                my $challenge = socket_read()
+                    || return fail("AUTH DIGEST-MD5 failed: $server_reply");
+                $challenge =~ s/^\d+\s+//; $challenge =~ s/[\r\n]+$//;
+                warn "\nCHALLENGE=", decode_base64($challenge), "\n" if ($mailcfg{debug} > 10);
+                my $response = _digest_md5($auth->{user}, $auth->{password}, decode_base64($challenge), $auth->{realm});
+                warn "\nRESPONSE=$response\n" if ($mailcfg{debug} > 10);
+                socket_write(encode_base64($response, ""), $CRLF)
+                    || return fail("AUTH DIGEST-MD5 failed: $server_reply");
+                my $status = socket_read()
+                    || return fail("AUTH DIGEST-MD5 failed: $server_reply");
+                if ($status =~ /^3/) {
+                    socket_write($CRLF)
+                        || return fail("AUTH DIGEST-MD5 failed: $server_reply");
+                    socket_read()
+                        || return fail("AUTH DIGEST-MD5 failed: $server_reply");
+                }
+            }
+            else {
+                return fail("$method not supported (and wrongly advertised as supported by this silly module)\n");
+            }
+            $log .= "AUTH $method succeeded as user $auth->{user}\n";
+        }
+        else {
+            $esmtp{'AUTH'} =~ s/(^\s+|\s+$)//g; # cleanup for printig it below
+            if ($auth->{required}) {
+                return fail("Required AUTH method '$auth->{method}' not supported. "
+                            ."(Server supports '$esmtp{'AUTH'}'. Module supports: '$auth_support')");
+            }
+            else {
+                warn "No common authentication method! Requested: '$auth->{method}'. Server supports '$esmtp{'AUTH'}'. Module supports: '$auth_support'. Skipping authentication\n";
+            }
+        }
+    }
+    socket_write("MAIL FROM:<$fromaddr>$CRLF")
         || return fail("send MAIL FROM: error");
     socket_read()
         || return fail("MAIL FROM: error ($_)");
 
+    my $to_ok = 0;
     foreach $to (@recipients) {
-        socket_write("RCPT TO: <$to>$CRLF")
+        socket_write("RCPT TO:<$to>$CRLF")
             || return fail("send RCPT TO: error");
-        socket_read()
-            || return fail("RCPT TO: error ($_)");
-        $log .= "$to\n    ";
+        if (socket_read()) {
+            $log .= "To: $to\n";
+            $to_ok++;
+        } else {
+            $log .= "FAILED To: $to ($server_reply)";
+            $error .= "Bad recipient <$to>: $server_reply\n";
+        }
+    }
+    unless ($to_ok) {
+        return fail("No valid recipient");
     }
 
     # start data part
@@ -402,9 +585,11 @@ __END__
 Simple platform independent e-mail from your perl script. Only requires
 Perl 5 and a network connection.
 
-Mail::Sendmail contains mainly &sendmail, which takes a hash with the
-message to send and sends it. It is intended to be very easy to setup and
-use. See also L<"FEATURES"> below.
+Mail::Sendmail takes a hash with the message to send and sends it to your
+mail server. It is intended to be very easy to setup and
+use. See also L<"FEATURES"> below, and as usual, read this documentation.
+
+There is also a FAQ (see L<"NOTES">).
 
 =head1 INSTALLATION
 
@@ -432,7 +617,13 @@ Copy Sendmail.pm to Mail/ in your Perl lib directory.
 
 =item ActivePerl's PPM
 
-ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
+Depending on your PPM version:
+
+    ppm install --location=http://alma.ch/perl/ppm Mail-Sendmail
+
+or
+
+    ppm install http://alma.ch/perl/ppm/Mail-Sendmail.ppd
 
 But this way you don't get a chance to have a look at other files (Changes,
 Todo, test.pl, ...).
@@ -461,11 +652,11 @@ down
 
 Good plain text error reporting
 
+Experimental support for SMTP AUTHentication
+
 =head1 LIMITATIONS
 
 Headers are not encoded, even if they have accented characters.
-
-No suport for the SMTP AUTH extension.
 
 Since the whole message is in memory, it's not suitable for
 sending very big attached files.
@@ -510,8 +701,8 @@ sendmail is the only thing exported to your namespace by default
 
 C<sendmail(%mail) || print "Error sending mail: $Mail::Sendmail::error\n";>
 
-It takes a hash containing the full message, with keys for all headers,
-body, and optionally for another non-default SMTP server and/or port.
+It takes a hash containing the full message, with keys for all headers
+and the body, as well as for some specific options.
 
 It returns 1 on success or 0 on error, and rewrites
 C<$Mail::Sendmail::error> and C<$Mail::Sendmail::log>.
@@ -539,9 +730,61 @@ The following headers are added unless you specify them yourself:
 If you wish to use an envelope sender address different than the
 From: address, set C<$mail{Sender}> in your %mail hash.
 
+
+
 The following are not exported by default, but you can still access them
 with their full name, or request their export on the use line like in:
 C<use Mail::Sendmail qw(sendmail $address_rx time_to_date);>
+
+=head3 embedding options in your %mail hash
+
+The following options can be set in your %mail hash. The corresponding keys
+will be removed before sending the mail.
+
+=over 4
+
+=item $mail{smtp} or $mail{server}
+
+The SMTP server to try first. It will be added
+
+=item $mail{port}
+
+This option will be removed. To use a non-standard port, set it in your server name:
+
+$mail{server}='my.smtp.server:2525' will try to connect to port 2525 on server my.smtp.server
+
+=item $mail{auth}
+
+This must be a reference to a hash containg all your authentication options:
+
+$mail{auth} = \%options;
+or
+$mail{auth} = {user=>"username", password=>"password", method=>"DIGEST-MD5", required=>0 };
+
+=over
+
+=item user
+
+username
+
+=item pass or password
+
+password
+
+=item method
+
+optional method. compared (stripped down) to available methods. If empty, will try all available.
+
+=item required
+
+optional. defaults to false. If set to true, no delivery will be attempted if
+authentication fails. If false or undefined, and authentication fails or is not available, sending is tried without.
+
+(different auth for different servers?)
+
+=back
+
+=back
 
 =head2 Mail::Sendmail::time_to_date()
 
@@ -578,7 +821,7 @@ characters that would need to be quoted are not supported.
 
 =head2 %Mail::Sendmail::mailcfg
 
-This hash contains all configuration options. You normally edit it once (if
+This hash contains installation-wide configuration options. You normally edit it once (if
 ever) in Sendmail.pm and forget about it, but you could also access it from
 your scripts. For readability, I'll assume you have imported it
 (with something like C<use Mail::Sendmail qw(sendmail %mailcfg)>).
@@ -731,42 +974,26 @@ from your scripts.
   else { print "Error sending mail: $Mail::Sendmail::error \n" }
 
   print "\n\$Mail::Sendmail::log says:\n", $Mail::Sendmail::log;
- 
+
 Also see http://alma.ch/perl/Mail-Sendmail-FAQ.html for examples
-of HTML mail and sending attachments. 
+of HTML mail and sending attachments.
 
 =head1 CHANGES
 
-Main changes since version 0.78:
+Main changes since version 0.79:
 
-Added "/" (\x2F) as a valid character in mailbox part.
+Experimental SMTP AUTH support (LOGIN PLAIN CRAM-MD5 DIGEST-MD5)
 
-Removed old configuration variables which are not used anymore
-since version 0.74.
+Fix bug where one refused RCPT TO: would abort everything
 
-Added support for different envelope sender (through C<$mail{Sender}>)
+send EHLO, and parse response
 
-Changed case of headers: first character after "-" also uppercased
+Better handling of multi-line responses, and better error-messages
 
-Support for multi-line server responses
+Non-conforming line-endings also normalized in headers
 
-Localized $\ and $_
-
-Some internal rewrites and documentation updates
-
-Fixed old bug of dot as 76th character on line disappearing.
-
-Fixed very old bug where port number was not extracted from
-stuff like 'my.server:2525'.
-
-Fixed time_to_date bug with negative half-hour zones (only Newfoundland?)
-
-Added seconds to date string
-
-Now uses Sys::Hostname to get the hostname for HELO. (This may break the
-module on some very old Win32 Perls where Sys::Hostname was broken)
-
-Enable full session output for debugging
+Now keeps the Sender header if it was used. Previous versions
+only used it for the MAIL FROM: command and deleted it.
 
 See the F<Changes> file for the full history. If you don't have it
 because you installed through PPM, you can also find the latest

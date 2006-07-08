@@ -6,3 +6,4 @@ Sendmail.html
 Sendmail.pm
 test.pl
 Todo
+META.yml                                 Module meta-data (added by MakeMaker)
